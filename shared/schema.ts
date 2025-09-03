@@ -70,6 +70,7 @@ export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
 
 export const insertGameSchema = createInsertSchema(games).omit({
   id: true,
+  code: true,
   createdAt: true,
 });
 
