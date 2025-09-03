@@ -263,6 +263,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // REST API Routes
 
+  // Admin Authentication
+  app.post('/api/admin/register', async (req, res) => {
+    try {
+      const adminData = { name: req.body.name, email: req.body.email };
+      const admin = await storage.createAdminUser(adminData);
+      res.json({ adminId: admin.id, name: admin.name });
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid admin data' });
+    }
+  });
+
+  app.post('/api/admin/login', async (req, res) => {
+    try {
+      // Simple login - in production you'd verify credentials
+      const { adminId } = req.body;
+      const admin = await storage.getAdminUser(adminId);
+      if (!admin) {
+        res.status(404).json({ error: 'Admin not found' });
+        return;
+      }
+      res.json({ adminId: admin.id, name: admin.name });
+    } catch (error) {
+      res.status(500).json({ error: 'Login failed' });
+    }
+  });
+
   // Games
   app.post('/api/games', async (req, res) => {
     try {

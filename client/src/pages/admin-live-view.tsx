@@ -16,6 +16,14 @@ interface Session {
   endsAt?: string;
 }
 
+interface SessionData {
+  id: string;
+  gameId: string;
+  question: string;
+  status: string;
+  endsAt?: string;
+}
+
 export default function AdminLiveView() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
@@ -35,7 +43,7 @@ export default function AdminLiveView() {
     }
   }, [location]);
 
-  const { data: sessionData } = useQuery({
+  const { data: sessionData } = useQuery<SessionData>({
     queryKey: ["/api/sessions", sessionId],
     enabled: !!sessionId,
   });
@@ -94,7 +102,7 @@ export default function AdminLiveView() {
   // Use session data from API if not connected to WebSocket
   useEffect(() => {
     if (sessionData && !session) {
-      setSession(sessionData);
+      setSession(sessionData as Session);
       if (sessionData.endsAt) {
         const remaining = Math.max(0, new Date(sessionData.endsAt).getTime() - Date.now());
         setTimeRemaining(Math.floor(remaining / 1000));

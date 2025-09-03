@@ -37,6 +37,17 @@ export default function AdminConsole() {
   const [newQuestion, setNewQuestion] = useState("");
   const [newTimer, setNewTimer] = useState("30");
 
+  // Check if admin is authenticated
+  const adminId = localStorage.getItem("adminId");
+  const adminName = localStorage.getItem("adminName");
+
+  useEffect(() => {
+    if (!adminId) {
+      toast({ title: "Access Required", description: "Please complete admin setup first", variant: "destructive" });
+      navigate("/admin/setup");
+    }
+  }, [adminId, navigate, toast]);
+
   // Extract game ID from URL
   useEffect(() => {
     const match = location.match(/\/admin\/games\/(.+)/);
@@ -45,12 +56,12 @@ export default function AdminConsole() {
     }
   }, [location]);
 
-  const { data: game } = useQuery({
+  const { data: game } = useQuery<Game>({
     queryKey: ["/api/games", gameId],
     enabled: !!gameId,
   });
 
-  const { data: sessions } = useQuery({
+  const { data: sessions } = useQuery<Session[]>({
     queryKey: ["/api/games", gameId, "sessions"],
     enabled: !!gameId,
   });
@@ -182,10 +193,18 @@ export default function AdminConsole() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" data-testid="button-settings">
-                <Settings className="w-4 h-4 mr-2" />
-                Settings
-              </Button>
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-muted-foreground">Admin: {adminName}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate("/admin/setup")}
+                  data-testid="button-settings"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Setup
+                </Button>
+              </div>
             </div>
           </div>
         </div>

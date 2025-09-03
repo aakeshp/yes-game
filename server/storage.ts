@@ -65,6 +65,7 @@ export class MemStorage implements IStorage {
     const user: AdminUser = { 
       ...insertUser, 
       id, 
+      email: insertUser.email || null,
       createdAt: new Date() 
     };
     this.adminUsers.set(id, user);
@@ -87,6 +88,7 @@ export class MemStorage implements IStorage {
       ...insertGame, 
       id, 
       code,
+      status: insertGame.status || "active",
       createdAt: new Date() 
     };
     this.games.set(id, game);
@@ -115,6 +117,7 @@ export class MemStorage implements IStorage {
     const session: Session = { 
       ...insertSession, 
       id, 
+      status: insertSession.status || "draft",
       startedAt: null,
       endsAt: null,
       endedAt: null,
@@ -159,6 +162,7 @@ export class MemStorage implements IStorage {
     const participant: Participant = { 
       ...insertParticipant, 
       id, 
+      ownerAdminUserId: insertParticipant.ownerAdminUserId || null,
       createdAt: new Date() 
     };
     this.participants.set(id, participant);
@@ -191,6 +195,8 @@ export class MemStorage implements IStorage {
       const submission: Submission = {
         ...insertSubmission,
         id,
+        vote: insertSubmission.vote || null,
+        guessYesCount: insertSubmission.guessYesCount || null,
         submittedAt: new Date()
       };
       this.submissions.set(id, submission);

@@ -9,6 +9,7 @@ import LiveSession from "@/pages/live-session";
 import Results from "@/pages/results";
 import AdminConsole from "@/pages/admin-console";
 import AdminLiveView from "@/pages/admin-live-view";
+import AdminSetup from "@/pages/admin-setup";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/play/:gameCode" component={GameLobby} />
       <Route path="/session/:sessionId" component={LiveSession} />
       <Route path="/results/:sessionId" component={Results} />
+      <Route path="/admin/setup" component={AdminSetup} />
       <Route path="/admin/games/:gameId" component={AdminConsole} />
       <Route path="/admin/sessions/:sessionId" component={AdminLiveView} />
       <Route component={NotFound} />

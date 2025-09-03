@@ -17,6 +17,13 @@ interface Session {
   endsAt?: string;
 }
 
+interface Game {
+  id: string;
+  name: string;
+  code: string;
+  status: string;
+}
+
 export default function GameLobby() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
@@ -40,12 +47,12 @@ export default function GameLobby() {
     }
   }, [location]);
 
-  const { data: game, isLoading: gameLoading } = useQuery({
+  const { data: game, isLoading: gameLoading } = useQuery<Game>({
     queryKey: ["/api/games/code", gameCode],
     enabled: !!gameCode,
   });
 
-  const { data: sessions, isLoading: sessionsLoading } = useQuery({
+  const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
     queryKey: ["/api/games", currentGameId, "sessions"],
     enabled: !!currentGameId,
   });
@@ -138,8 +145,13 @@ export default function GameLobby() {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" data-testid="button-settings">
-                Settings
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => navigate("/admin/setup")}
+                data-testid="button-settings"
+              >
+                Admin Setup
               </Button>
             </div>
           </div>

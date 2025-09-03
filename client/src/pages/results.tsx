@@ -35,6 +35,12 @@ interface Game {
   }>;
 }
 
+interface SessionWithResults {
+  id: string;
+  gameId: string;
+  results?: SessionResults;
+}
+
 export default function Results() {
   const [location, navigate] = useLocation();
   const [sessionId, setSessionId] = useState<string>("");
@@ -47,12 +53,12 @@ export default function Results() {
     }
   }, [location]);
 
-  const { data: session, isLoading } = useQuery({
+  const { data: session, isLoading } = useQuery<SessionWithResults>({
     queryKey: ["/api/sessions", sessionId],
     enabled: !!sessionId,
   });
 
-  const { data: game } = useQuery({
+  const { data: game } = useQuery<Game>({
     queryKey: ["/api/games", session?.gameId],
     enabled: !!session?.gameId,
   });
@@ -255,7 +261,7 @@ export default function Results() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {game.leaderboard.slice(0, 10).map((player, index) => (
+                {game.leaderboard.slice(0, 10).map((player: Game['leaderboard'][0], index: number) => (
                   <div key={player.participantId} className="flex items-center justify-between p-4 bg-muted rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
