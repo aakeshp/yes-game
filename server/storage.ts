@@ -1,5 +1,8 @@
 import { type AdminUser, type InsertAdminUser, type Game, type InsertGame, type Session, type InsertSession, type Participant, type InsertParticipant, type Submission, type InsertSubmission, type SessionPoints, type GameWithLeaderboard, type SessionResults } from "@shared/schema";
 import { randomUUID } from "crypto";
+import { db } from "./db";
+import { adminUsers, games, sessions, participants, submissions, sessionPoints } from "@shared/schema";
+import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
   // Admin Users
@@ -323,4 +326,274 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export class DatabaseStorage implements IStorage {
+  private generateGameCode(): string {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
+  }
+
+  // Admin Users
+  async getAdminUser(id: string): Promise<AdminUser | undefined> {
+    const [user] = await db.select().from(adminUsers).where(eq(adminUsers.id, id));
+    return user || undefined;
+  }
+
+  async createAdminUser(insertUser: InsertAdminUser): Promise<AdminUser> {
+    const [user] = await db
+      .insert(adminUsers)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  // Games
+  async getGame(id: string): Promise<Game | undefined> {
+    const [game] = await db.select().from(games).where(eq(games.id, id));
+    return game || undefined;
+  }
+
+  async getGameByCode(code: string): Promise<Game | undefined> {
+    const [game] = await db.select().from(games).where(eq(games.code, code));
+    return game || undefined;
+  }
+
+  async getAllGames(): Promise<Game[]> {
+    return await db.select().from(games).orderBy(desc(games.createdAt));
+  }
+
+  async createGame(insertGame: InsertGame): Promise<Game> {
+    let code: string;
+    let attempts = 0;
+    do {
+      code = this.generateGameCode();
+      attempts++;
+      const existing = await this.getGameByCode(code);
+      if (!existing) break;
+    } while (attempts < 10);
+
+    const [game] = await db
+      .insert(games)
+      .values({ ...insertGame, code })
+      .returning();
+    return game;
+  }
+
+  async getGameWithLeaderboard(id: string): Promise<GameWithLeaderboard | undefined> {
+    const game = await this.getGame(id);
+    if (!game) return undefined;
+
+    const leaderboard = await this.getParticipantLeaderboardForGame(id);
+    return { ...game, leaderboard };
+  }
+
+  // Sessions
+  async getSession(id: string): Promise<Session | undefined> {
+    const [session] = await db.select().from(sessions).where(eq(sessions.id, id));
+    return session || undefined;
+  }
+
+  async getSessionsByGameId(gameId: string): Promise<Session[]> {
+    return await db.select().from(sessions).where(eq(sessions.gameId, gameId)).orderBy(desc(sessions.createdAt));
+  }
+
+  async createSession(insertSession: InsertSession): Promise<Session> {
+    const [session] = await db
+      .insert(sessions)
+      .values(insertSession)
+      .returning();
+    return session;
+  }
+
+  async updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined> {
+    const [session] = await db
+      .update(sessions)
+      .set(updates)
+      .where(eq(sessions.id, id))
+      .returning();
+    return session || undefined;
+  }
+
+  async updateSessionStatus(
+    id: string, 
+    status: "draft" | "live" | "closed" | "canceled",
+    timestamps?: { startedAt?: Date; endsAt?: Date; endedAt?: Date }
+  ): Promise<Session | undefined> {
+    const updateData: any = { status };
+    if (timestamps?.startedAt) updateData.startedAt = timestamps.startedAt;
+    if (timestamps?.endsAt) updateData.endsAt = timestamps.endsAt;
+    if (timestamps?.endedAt) updateData.endedAt = timestamps.endedAt;
+
+    const [session] = await db
+      .update(sessions)
+      .set(updateData)
+      .where(eq(sessions.id, id))
+      .returning();
+    return session || undefined;
+  }
+
+  // Participants
+  async getParticipant(id: string): Promise<Participant | undefined> {
+    const [participant] = await db.select().from(participants).where(eq(participants.id, id));
+    return participant || undefined;
+  }
+
+  async getParticipantsByGameId(gameId: string): Promise<Participant[]> {
+    return await db.select().from(participants).where(eq(participants.gameId, gameId));
+  }
+
+  async getParticipantByGameAndName(gameId: string, displayName: string): Promise<Participant | undefined> {
+    const [participant] = await db
+      .select()
+      .from(participants)
+      .where(sql`${participants.gameId} = ${gameId} AND ${participants.displayName} = ${displayName}`);
+    return participant || undefined;
+  }
+
+  async createParticipant(insertParticipant: InsertParticipant): Promise<Participant> {
+    const [participant] = await db
+      .insert(participants)
+      .values(insertParticipant)
+      .returning();
+    return participant;
+  }
+
+  // Submissions
+  async getSubmission(sessionId: string, participantId: string): Promise<Submission | undefined> {
+    const [submission] = await db
+      .select()
+      .from(submissions)
+      .where(sql`${submissions.sessionId} = ${sessionId} AND ${submissions.participantId} = ${participantId}`);
+    return submission || undefined;
+  }
+
+  async getSubmissionsBySessionId(sessionId: string): Promise<Submission[]> {
+    return await db.select().from(submissions).where(eq(submissions.sessionId, sessionId));
+  }
+
+  async upsertSubmission(insertSubmission: InsertSubmission): Promise<Submission> {
+    // Check if submission exists
+    const existing = await this.getSubmission(insertSubmission.sessionId, insertSubmission.participantId);
+    
+    if (existing) {
+      const [submission] = await db
+        .update(submissions)
+        .set(insertSubmission)
+        .where(sql`${submissions.sessionId} = ${insertSubmission.sessionId} AND ${submissions.participantId} = ${insertSubmission.participantId}`)
+        .returning();
+      return submission;
+    } else {
+      const [submission] = await db
+        .insert(submissions)
+        .values(insertSubmission)
+        .returning();
+      return submission;
+    }
+  }
+
+  // Session Points
+  async getSessionPointsBySessionId(sessionId: string): Promise<SessionPoints[]> {
+    return await db.select().from(sessionPoints).where(eq(sessionPoints.sessionId, sessionId));
+  }
+
+  async upsertSessionPoints(sessionId: string, participantId: string, points: number): Promise<SessionPoints> {
+    // Check if points exist
+    const [existing] = await db
+      .select()
+      .from(sessionPoints)
+      .where(sql`${sessionPoints.sessionId} = ${sessionId} AND ${sessionPoints.participantId} = ${participantId}`);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(sessionPoints)
+        .set({ points })
+        .where(sql`${sessionPoints.sessionId} = ${sessionId} AND ${sessionPoints.participantId} = ${participantId}`)
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(sessionPoints)
+        .values({ sessionId, participantId, points })
+        .returning();
+      return created;
+    }
+  }
+
+  // Complex operations
+  async calculateAndStoreSessionResults(sessionId: string): Promise<SessionResults> {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
+    const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
+    const noVotes = sessionSubmissions.filter(s => s.vote === 'NO').length;
+    
+    const participants = [];
+    const leaderboardDelta = [];
+
+    for (const submission of sessionSubmissions) {
+      const participant = await this.getParticipant(submission.participantId);
+      if (!participant) continue;
+
+      const points = this.calculatePoints(submission.guessYesCount, yesVotes);
+      
+      // Store points
+      if (points > 0) {
+        await this.upsertSessionPoints(sessionId, submission.participantId, points);
+      }
+
+      participants.push({
+        participantId: submission.participantId,
+        displayName: participant.displayName,
+        vote: submission.vote,
+        guess: submission.guessYesCount,
+        points
+      });
+
+      leaderboardDelta.push({
+        participantId: submission.participantId,
+        deltaPoints: points
+      });
+    }
+
+    const results: SessionResults = {
+      sessionId: session.id,
+      question: session.question,
+      yesCount: yesVotes,
+      noCount: noVotes,
+      participants,
+      leaderboardDelta
+    };
+
+    return results;
+  }
+
+  private calculatePoints(guess: number | null, actualYesCount: number): number {
+    if (guess === null) return 0;
+    if (guess === actualYesCount) return 5; // Exact match
+    if (Math.abs(guess - actualYesCount) === 1) return 3; // Within 1
+    return 0;
+  }
+
+  async getParticipantLeaderboardForGame(gameId: string): Promise<Array<{ participantId: string; displayName: string; totalPoints: number; sessionsPlayed: number }>> {
+    const result = await db
+      .select({
+        participantId: participants.id,
+        displayName: participants.displayName,
+        totalPoints: sql<number>`COALESCE(SUM(${sessionPoints.points}), 0)`,
+        sessionsPlayed: sql<number>`COUNT(DISTINCT ${sessionPoints.sessionId})`
+      })
+      .from(participants)
+      .leftJoin(sessionPoints, eq(participants.id, sessionPoints.participantId))
+      .where(eq(participants.gameId, gameId))
+      .groupBy(participants.id, participants.displayName)
+      .orderBy(desc(sql`COALESCE(SUM(${sessionPoints.points}), 0)`));
+
+    return result.map(r => ({
+      participantId: r.participantId,
+      displayName: r.displayName,
+      totalPoints: Number(r.totalPoints),
+      sessionsPlayed: Number(r.sessionsPlayed)
+    }));
+  }
+}
+
+export const storage = new DatabaseStorage();
