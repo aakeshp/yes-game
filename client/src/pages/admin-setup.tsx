@@ -29,17 +29,13 @@ export default function AdminSetup() {
 
   // If admin exists and has games, redirect to last game
   useEffect(() => {
-    console.log("Admin setup redirect check:", { isAdminCreated, games, gamesLength: games?.length });
     if (isAdminCreated && games && Array.isArray(games) && games.length > 0) {
       const lastGameId = localStorage.getItem("lastGameId");
-      console.log("Checking for existing game:", lastGameId);
       const gameExists = games.find((g: any) => g.id === lastGameId);
       if (gameExists) {
-        console.log("Redirecting to existing game:", lastGameId);
         navigate(`/admin/games/${lastGameId}`);
       } else {
         // Use the most recent game
-        console.log("Using most recent game:", games[0].id);
         localStorage.setItem("lastGameId", games[0].id);
         navigate(`/admin/games/${games[0].id}`);
       }
@@ -120,8 +116,15 @@ export default function AdminSetup() {
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="text-center mb-8">
-          <h2 className="text-3xl font-bold text-foreground mb-4">Admin Setup</h2>
-          <p className="text-muted-foreground">Set up your admin account and create your first game</p>
+          <h2 className="text-3xl font-bold text-foreground mb-4">
+            {isAdminCreated ? "Game Management" : "Admin Setup"}
+          </h2>
+          <p className="text-muted-foreground">
+            {isAdminCreated 
+              ? "Welcome back! Manage your games or create new ones" 
+              : "Set up your admin account and create your first game"
+            }
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -176,7 +179,10 @@ export default function AdminSetup() {
                     <Users className="w-8 h-8 text-secondary-foreground" />
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Admin Account Ready</h3>
-                  <p className="text-sm text-muted-foreground">Welcome, {currentAdminName}!</p>
+                  <p className="text-sm text-muted-foreground">Welcome back, {currentAdminName}!</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Your admin account is active and ready to manage games.
+                  </p>
                 </div>
               )}
             </CardContent>
