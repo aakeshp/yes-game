@@ -148,20 +148,7 @@ export default function GameLobby() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => {
-                  const adminId = localStorage.getItem("adminId");
-                  if (adminId) {
-                    // Admin exists, check for existing games
-                    const lastGameId = localStorage.getItem("lastGameId");
-                    if (lastGameId) {
-                      navigate(`/admin/games/${lastGameId}`);
-                    } else {
-                      navigate("/admin/setup");
-                    }
-                  } else {
-                    navigate("/admin/setup");
-                  }
-                }}
+                onClick={() => navigate("/admin/setup")}
                 data-testid="button-settings"
               >
                 {localStorage.getItem("adminId") ? "Admin Console" : "Admin Setup"}

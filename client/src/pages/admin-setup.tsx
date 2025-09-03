@@ -35,10 +35,13 @@ export default function AdminSetup() {
       if (gameExists) {
         navigate(`/admin/games/${lastGameId}`);
       } else {
-        // Use the most recent game
+        // Use the most recent game and update localStorage
         localStorage.setItem("lastGameId", games[0].id);
         navigate(`/admin/games/${games[0].id}`);
       }
+    } else if (isAdminCreated && games && Array.isArray(games) && games.length === 0) {
+      // Clear old game ID if no games exist
+      localStorage.removeItem("lastGameId");
     }
   }, [isAdminCreated, games, navigate]);
 
