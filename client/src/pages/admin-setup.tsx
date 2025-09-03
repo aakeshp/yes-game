@@ -13,9 +13,38 @@ import { Settings, Users, GamepadIcon } from "lucide-react";
 export default function AdminSetup() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const [adminName, setAdminName] = useState("");
-  const [adminEmail, setAdminEmail] = useState("");
+  const [adminNameInput, setAdminNameInput] = useState("");
+  const [adminEmailInput, setAdminEmailInput] = useState("");
   const [gameName, setGameName] = useState("");
+  const [showCreateGame, setShowCreateGame] = useState(false);
+
+  const isAdminCreated = localStorage.getItem("adminId");
+  const currentAdminName = localStorage.getItem("adminName");
+
+  // Fetch existing games if admin is authenticated
+  const { data: games } = useQuery<any[]>({
+    queryKey: ["/api/admin/games"],
+    enabled: !!isAdminCreated,
+  });
+
+  // If admin exists and has games, redirect to last game
+  useEffect(() => {
+    console.log("Admin setup redirect check:", { isAdminCreated, games, gamesLength: games?.length });
+    if (isAdminCreated && games && Array.isArray(games) && games.length > 0) {
+      const lastGameId = localStorage.getItem("lastGameId");
+      console.log("Checking for existing game:", lastGameId);
+      const gameExists = games.find((g: any) => g.id === lastGameId);
+      if (gameExists) {
+        console.log("Redirecting to existing game:", lastGameId);
+        navigate(`/admin/games/${lastGameId}`);
+      } else {
+        // Use the most recent game
+        console.log("Using most recent game:", games[0].id);
+        localStorage.setItem("lastGameId", games[0].id);
+        navigate(`/admin/games/${games[0].id}`);
+      }
+    }
+  }, [isAdminCreated, games, navigate]);
 
   const registerAdminMutation = useMutation({
     mutationFn: async (data: { name: string; email: string }) => {
@@ -48,13 +77,13 @@ export default function AdminSetup() {
   });
 
   const handleCreateAdmin = () => {
-    if (!adminName.trim()) {
+    if (!adminNameInput.trim()) {
       toast({ title: "Error", description: "Please enter your name", variant: "destructive" });
       return;
     }
     registerAdminMutation.mutate({
-      name: adminName.trim(),
-      email: adminEmail.trim()
+      name: adminNameInput.trim(),
+      email: adminEmailInput.trim()
     });
   };
 
@@ -67,8 +96,6 @@ export default function AdminSetup() {
       name: gameName.trim()
     });
   };
-
-  const isAdminCreated = localStorage.getItem("adminId");
 
   return (
     <div className="min-h-screen bg-background">
@@ -116,8 +143,8 @@ export default function AdminSetup() {
                       id="admin-name"
                       type="text"
                       placeholder="Enter your name"
-                      value={adminName}
-                      onChange={(e) => setAdminName(e.target.value)}
+                      value={adminNameInput}
+                      onChange={(e) => setAdminNameInput(e.target.value)}
                       className="mt-1"
                       data-testid="input-admin-name"
                     />
@@ -128,15 +155,15 @@ export default function AdminSetup() {
                       id="admin-email"
                       type="email"
                       placeholder="your.email@example.com"
-                      value={adminEmail}
-                      onChange={(e) => setAdminEmail(e.target.value)}
+                      value={adminEmailInput}
+                      onChange={(e) => setAdminEmailInput(e.target.value)}
                       className="mt-1"
                       data-testid="input-admin-email"
                     />
                   </div>
                   <Button 
                     onClick={handleCreateAdmin}
-                    disabled={registerAdminMutation.isPending || !adminName.trim()}
+                    disabled={registerAdminMutation.isPending || !adminNameInput.trim()}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                     data-testid="button-create-admin"
                   >
@@ -149,7 +176,7 @@ export default function AdminSetup() {
                     <Users className="w-8 h-8 text-secondary-foreground" />
                   </div>
                   <h3 className="font-medium text-foreground mb-1">Admin Account Ready</h3>
-                  <p className="text-sm text-muted-foreground">Welcome, {localStorage.getItem("adminName")}!</p>
+                  <p className="text-sm text-muted-foreground">Welcome, {currentAdminName}!</p>
                 </div>
               )}
             </CardContent>
