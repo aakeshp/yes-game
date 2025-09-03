@@ -36,6 +36,9 @@ export default function AdminConsole() {
   const [gameId, setGameId] = useState<string>("");
   const [newQuestion, setNewQuestion] = useState("");
   const [newTimer, setNewTimer] = useState("30");
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [editQuestion, setEditQuestion] = useState("");
+  const [editTimer, setEditTimer] = useState("30");
 
   // Check if admin is authenticated
   const adminId = localStorage.getItem("adminId");
@@ -78,6 +81,23 @@ export default function AdminConsole() {
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to create session", variant: "destructive" });
+    }
+  });
+
+  const updateSessionMutation = useMutation({
+    mutationFn: async ({ sessionId, updates }: { sessionId: string; updates: { question: string; timerSeconds: number } }) => {
+      const response = await apiRequest("PATCH", `/api/sessions/${sessionId}`, updates);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ title: "Success", description: "Session updated successfully" });
+      setEditingSession(null);
+      setEditQuestion("");
+      setEditTimer("30");
+      queryClient.invalidateQueries({ queryKey: ["/api/games", gameId, "sessions"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update session", variant: "destructive" });
     }
   });
 
@@ -144,6 +164,28 @@ export default function AdminConsole() {
         toast({ title: "Success", description: "Join link copied to clipboard" });
       });
     }
+  };
+
+  const handleUpdateSession = () => {
+    if (!editQuestion.trim()) {
+      toast({ title: "Error", description: "Please enter a question", variant: "destructive" });
+      return;
+    }
+    if (!editingSession) return;
+    
+    updateSessionMutation.mutate({
+      sessionId: editingSession.id,
+      updates: {
+        question: editQuestion.trim(),
+        timerSeconds: parseInt(editTimer)
+      }
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingSession(null);
+    setEditQuestion("");
+    setEditTimer("30");
   };
 
   const getStatusBadge = (status: string) => {
@@ -376,6 +418,59 @@ export default function AdminConsole() {
                   </div>
                 )}
 
+                {/* Edit Session Form */}
+                {editingSession && (
+                  <Card className="border-2 border-accent bg-accent/5 mb-4">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-lg">Edit Session</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <Label htmlFor="edit-question">Question</Label>
+                        <Input
+                          id="edit-question"
+                          type="text"
+                          placeholder="Enter your Yes/No question"
+                          value={editQuestion}
+                          onChange={(e) => setEditQuestion(e.target.value)}
+                          className="mt-1"
+                          data-testid="input-edit-question"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="edit-timer">Timer (seconds)</Label>
+                        <Input
+                          id="edit-timer"
+                          type="number"
+                          min="10"
+                          max="300"
+                          value={editTimer}
+                          onChange={(e) => setEditTimer(e.target.value)}
+                          className="mt-1"
+                          data-testid="input-edit-timer"
+                        />
+                      </div>
+                      <div className="flex space-x-3">
+                        <Button 
+                          onClick={handleUpdateSession}
+                          disabled={updateSessionMutation.isPending || !editQuestion.trim()}
+                          className="flex-1"
+                          data-testid="button-save-session"
+                        >
+                          {updateSessionMutation.isPending ? "Saving..." : "Save Changes"}
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          onClick={handleCancelEdit}
+                          data-testid="button-cancel-edit"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
                 {/* Session List */}
                 <div>
                   <h4 className="font-medium text-foreground mb-3">All Sessions</h4>
@@ -404,6 +499,10 @@ export default function AdminConsole() {
                                 navigate(`/admin/sessions/${session.id}`);
                               } else if (session.status === 'closed') {
                                 navigate(`/results/${session.id}`);
+                              } else if (session.status === 'draft') {
+                                setEditingSession(session);
+                                setEditQuestion(session.question);
+                                setEditTimer(session.timerSeconds.toString());
                               }
                             }}
                             data-testid={`button-session-action-${session.id}`}

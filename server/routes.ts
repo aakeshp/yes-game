@@ -350,6 +350,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/sessions/:sessionId', async (req, res) => {
+    try {
+      const session = await storage.getSession(req.params.sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+      
+      // Only allow editing draft sessions
+      if (session.status !== 'draft') {
+        res.status(400).json({ error: 'Can only edit draft sessions' });
+        return;
+      }
+
+      const updateData = insertSessionSchema.partial().parse(req.body);
+      const updatedSession = await storage.updateSession(req.params.sessionId, updateData);
+      
+      if (!updatedSession) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+      
+      res.json(updatedSession);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid session data' });
+    }
+  });
+
   app.get('/api/sessions/:sessionId', async (req, res) => {
     try {
       const session = await storage.getSession(req.params.sessionId);

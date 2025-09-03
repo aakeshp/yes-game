@@ -17,6 +17,7 @@ export interface IStorage {
   getSession(id: string): Promise<Session | undefined>;
   getSessionsByGameId(gameId: string): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
+  updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined>;
   updateSessionStatus(id: string, status: "draft" | "live" | "closed" | "canceled", timestamps?: { startedAt?: Date; endsAt?: Date; endedAt?: Date }): Promise<Session | undefined>;
   
   // Participants
@@ -132,6 +133,15 @@ export class MemStorage implements IStorage {
     };
     this.sessions.set(id, session);
     return session;
+  }
+
+  async updateSession(id: string, updates: Partial<InsertSession>): Promise<Session | undefined> {
+    const session = this.sessions.get(id);
+    if (!session) return undefined;
+    
+    const updatedSession = { ...session, ...updates };
+    this.sessions.set(id, updatedSession);
+    return updatedSession;
   }
 
   async updateSessionStatus(id: string, status: "draft" | "live" | "closed" | "canceled", timestamps?: { startedAt?: Date; endsAt?: Date; endedAt?: Date }): Promise<Session | undefined> {
