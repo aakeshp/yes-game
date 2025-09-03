@@ -289,6 +289,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/games', async (req, res) => {
+    try {
+      // In a real app, you'd filter by admin ID
+      const games = await storage.getAllGames();
+      res.json(games);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch games' });
+    }
+  });
+
   // Games
   app.post('/api/games', async (req, res) => {
     try {

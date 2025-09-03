@@ -9,6 +9,7 @@ export interface IStorage {
   // Games
   getGame(id: string): Promise<Game | undefined>;
   getGameByCode(code: string): Promise<Game | undefined>;
+  getAllGames(): Promise<Game[]>;
   createGame(game: InsertGame): Promise<Game>;
   getGameWithLeaderboard(id: string): Promise<GameWithLeaderboard | undefined>;
   
@@ -79,6 +80,12 @@ export class MemStorage implements IStorage {
   async getGameByCode(code: string): Promise<Game | undefined> {
     const gameId = this.gameCodeMap.get(code);
     return gameId ? this.games.get(gameId) : undefined;
+  }
+
+  async getAllGames(): Promise<Game[]> {
+    return Array.from(this.games.values()).sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
   }
 
   async createGame(insertGame: InsertGame): Promise<Game> {

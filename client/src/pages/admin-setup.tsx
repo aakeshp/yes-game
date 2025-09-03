@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,6 +38,7 @@ export default function AdminSetup() {
       return response.json();
     },
     onSuccess: (game) => {
+      localStorage.setItem("lastGameId", game.gameId);
       toast({ title: "Success", description: "Game created successfully" });
       navigate(`/admin/games/${game.gameId}`);
     },
