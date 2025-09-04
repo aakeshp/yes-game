@@ -105,7 +105,7 @@ export default function GameLobby() {
       const participant = await participantResponse.json();
       localStorage.setItem(`participantId_${gameCode}`, participant.id);
       
-      navigate(`/session/${session.id}`);
+      navigate(`/session/${session.id}?game=${gameCode}`);
     } catch (error) {
       toast({ title: "Error", description: "Failed to join session", variant: "destructive" });
     }
