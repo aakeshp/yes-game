@@ -65,12 +65,12 @@ export default function LiveSession() {
     }
   }, [isConnected, sessionId]); // Removed joinSession dependency to prevent infinite loops
 
-  // Clean up session state when leaving
+  // Clean up when leaving the page
   useEffect(() => {
     return () => {
-      socket.clearSession();
+      // No cleanup needed - connection handled by useWebSocket hook
     };
-  }, [socket]);
+  }, []);
 
   // WebSocket event listeners
   useEffect(() => {

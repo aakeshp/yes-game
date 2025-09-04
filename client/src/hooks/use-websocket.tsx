@@ -13,7 +13,7 @@ export function useWebSocket() {
     const connect = async () => {
       try {
         await gameSocket.connect();
-        setIsConnected(true);
+        setIsConnected(gameSocket.isReady());
         setError(null);
       } catch (err) {
         setError('Failed to connect to game server');
@@ -21,9 +21,17 @@ export function useWebSocket() {
       }
     };
 
+    // Update connection state when WebSocket state changes
+    const updateConnectionState = () => {
+      setIsConnected(gameSocket.isReady());
+    };
+
+    gameSocket.on('connection:ready', updateConnectionState);
+    
     connect();
 
     return () => {
+      gameSocket.off('connection:ready', updateConnectionState);
       gameSocket.disconnect();
     };
   }, []);

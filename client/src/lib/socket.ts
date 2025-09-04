@@ -1,33 +1,27 @@
 export class GameSocket {
   private ws: WebSocket | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
-  
-  // Session recovery state
-  private lastSessionId: string | null = null;
-  private lastParticipantId: string | null = null;
-  private lastDisplayName: string | null = null;
-  private isAdmin: boolean = false;
+  private isConnecting: boolean = false;
+  private isConnected: boolean = false;
 
   connect(): Promise<void> {
+    // Prevent multiple concurrent connections
+    if (this.isConnected || this.isConnecting) {
+      return Promise.resolve();
+    }
+
     return new Promise((resolve, reject) => {
+      this.isConnecting = true;
+      
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}/game-ws`;
       
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');
-        const wasReconnecting = this.reconnectAttempts > 0;
-        this.reconnectAttempts = 0;
-        
-        // Auto-rejoin session after reconnection
-        if (wasReconnecting) {
-          this.recoverSession();
-        }
-        
+        this.isConnected = true;
+        this.isConnecting = false;
         resolve();
       };
 
@@ -35,7 +29,6 @@ export class GameSocket {
         try {
           const data = JSON.parse(event.data);
           if (data.type === 'connection:ready') {
-            // Connection established successfully
             return;
           }
           this.emit(data.type, data.payload || data);
@@ -46,68 +39,29 @@ export class GameSocket {
 
       this.ws.onclose = () => {
         console.log('WebSocket disconnected');
-        this.attemptReconnect();
+        this.isConnected = false;
+        this.isConnecting = false;
       };
 
       this.ws.onerror = (error) => {
         console.error('WebSocket error:', error);
+        console.error('WebSocket URL was:', wsUrl);
+        this.isConnected = false;
+        this.isConnecting = false;
         reject(error);
       };
     });
   }
 
-  private attemptReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
-      this.reconnectAttempts++;
-      setTimeout(() => {
-        console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-        this.connect().catch((error) => {
-          console.error('Reconnection failed:', error);
-        });
-      }, this.reconnectDelay * this.reconnectAttempts);
-    } else {
-      console.error('Max reconnection attempts reached');
-    }
+  isReady(): boolean {
+    return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
   }
 
   send(type: string, payload?: any) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({ type, payload }));
-      
-      // Store session info for recovery
-      if (type === 'session:join' && payload) {
-        this.lastSessionId = payload.sessionId;
-        this.lastParticipantId = payload.participantId;
-        this.lastDisplayName = payload.displayName;
-        this.isAdmin = false;
-      } else if (type === 'admin:join' && payload) {
-        this.lastSessionId = payload.sessionId;
-        this.isAdmin = true;
-      }
-    }
-  }
-
-  private recoverSession() {
-    console.log('Session recovery triggered:', {
-      lastSessionId: this.lastSessionId,
-      isAdmin: this.isAdmin,
-      hasParticipantData: !!(this.lastParticipantId || this.lastDisplayName)
-    });
-    
-    if (this.lastSessionId) {
-      setTimeout(() => {
-        if (this.isAdmin) {
-          console.log('Auto-recovering admin session');
-          this.send('admin:join', { sessionId: this.lastSessionId });
-        } else if (this.lastSessionId && (this.lastParticipantId || this.lastDisplayName)) {
-          console.log('Auto-recovering participant session');
-          this.send('session:join', { 
-            sessionId: this.lastSessionId, 
-            participantId: this.lastParticipantId,
-            displayName: this.lastDisplayName
-          });
-        }
-      }, 100); // Small delay to ensure connection is ready
+    if (this.isReady()) {
+      this.ws!.send(JSON.stringify({ type, payload }));
+    } else {
+      console.warn('WebSocket not ready, message dropped:', { type, payload });
     }
   }
 
@@ -137,16 +91,9 @@ export class GameSocket {
       this.ws.close();
       this.ws = null;
     }
+    this.isConnected = false;
+    this.isConnecting = false;
     this.listeners.clear();
-    // Don't clear session state - keep it for potential reconnection
-  }
-
-  clearSession() {
-    // Call this when truly leaving a session (not just disconnecting)
-    this.lastSessionId = null;
-    this.lastParticipantId = null;
-    this.lastDisplayName = null;
-    this.isAdmin = false;
   }
 }
 
