@@ -77,6 +77,9 @@ export default function Results() {
       queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
       queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "sessions"] });
       
+      // Admin detailed leaderboard (CRITICAL for leaderboard page refresh)
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games", session.gameId, "detailed-leaderboard"] });
+      
       // Game-by-code queries (for lobby access)
       queryClient.invalidateQueries({ queryKey: ["/api/games/code"] });
       
@@ -92,7 +95,8 @@ export default function Results() {
           const key = query.queryKey[0];
           return typeof key === "string" && (
             key.startsWith("/api/games") || 
-            key.startsWith("/api/sessions")
+            key.startsWith("/api/sessions") ||
+            key.startsWith("/api/admin")
           );
         }
       });
