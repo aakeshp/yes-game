@@ -66,7 +66,8 @@ export default function Results() {
 
   const { data: game } = useQuery<Game>({
     queryKey: ["/api/games", session?.gameId],
-    enabled: !!session?.gameId,
+    enabled: !!session?.gameId && !!session?.results, // Wait for results to be available
+    refetchOnMount: true, // Always fetch fresh data when component mounts
   });
 
   const handleBackToLobby = () => {

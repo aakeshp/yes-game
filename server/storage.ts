@@ -517,51 +517,77 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  private async upsertSessionPointsInTransaction(tx: any, sessionId: string, participantId: string, points: number): Promise<SessionPoints> {
+    // Check if points exist within transaction
+    const [existing] = await tx
+      .select()
+      .from(sessionPoints)
+      .where(sql`${sessionPoints.sessionId} = ${sessionId} AND ${sessionPoints.participantId} = ${participantId}`);
+    
+    if (existing) {
+      const [updated] = await tx
+        .update(sessionPoints)
+        .set({ points })
+        .where(sql`${sessionPoints.sessionId} = ${sessionId} AND ${sessionPoints.participantId} = ${participantId}`)
+        .returning();
+      return updated;
+    } else {
+      const [created] = await tx
+        .insert(sessionPoints)
+        .values({ sessionId, participantId, points })
+        .returning();
+      return created;
+    }
+  }
+
   // Complex operations
   async calculateAndStoreSessionResults(sessionId: string): Promise<SessionResults> {
-    const session = await this.getSession(sessionId);
-    if (!session) throw new Error('Session not found');
+    // Use transaction to ensure all session points are stored atomically
+    return await db.transaction(async (tx) => {
+      const session = await this.getSession(sessionId);
+      if (!session) throw new Error('Session not found');
 
-    const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
-    const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
-    const noVotes = sessionSubmissions.filter(s => s.vote === 'NO').length;
-    
-    const participants = [];
-    const leaderboardDelta = [];
-
-    for (const submission of sessionSubmissions) {
-      const participant = await this.getParticipant(submission.participantId);
-      if (!participant) continue;
-
-      const points = this.calculatePoints(submission.guessYesCount, yesVotes);
+      const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
+      const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
+      const noVotes = sessionSubmissions.filter(s => s.vote === 'NO').length;
       
-      // Store points (always record participation, even if 0 points)
-      await this.upsertSessionPoints(sessionId, submission.participantId, points);
+      const participants = [];
+      const leaderboardDelta = [];
 
-      participants.push({
-        participantId: submission.participantId,
-        displayName: participant.displayName,
-        vote: submission.vote,
-        guess: submission.guessYesCount,
-        points
-      });
+      for (const submission of sessionSubmissions) {
+        const participant = await this.getParticipant(submission.participantId);
+        if (!participant) continue;
 
-      leaderboardDelta.push({
-        participantId: submission.participantId,
-        deltaPoints: points
-      });
-    }
+        const points = this.calculatePoints(submission.guessYesCount, yesVotes);
+        
+        // Store points within transaction (always record participation, even if 0 points)
+        await this.upsertSessionPointsInTransaction(tx, sessionId, submission.participantId, points);
 
-    const results: SessionResults = {
-      sessionId: session.id,
-      question: session.question,
-      yesCount: yesVotes,
-      noCount: noVotes,
-      participants,
-      leaderboardDelta
-    };
+        participants.push({
+          participantId: submission.participantId,
+          displayName: participant.displayName,
+          vote: submission.vote,
+          guess: submission.guessYesCount,
+          points
+        });
 
-    return results;
+        leaderboardDelta.push({
+          participantId: submission.participantId,
+          deltaPoints: points
+        });
+      }
+
+      const results: SessionResults = {
+        sessionId: session.id,
+        question: session.question,
+        yesCount: yesVotes,
+        noCount: noVotes,
+        participants,
+        leaderboardDelta
+      };
+
+      return results;
+    });
   }
 
   private calculatePoints(guess: number | null, actualYesCount: number): number {
