@@ -24,6 +24,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     connections.set(ws, { ws });
     console.log('New WebSocket connection');
 
+    // Send connection confirmation
+    ws.send(JSON.stringify({ type: 'connection:ready' }));
+
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
@@ -31,7 +34,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await handleWebSocketMessage(ws, data);
       } catch (error) {
         console.error('WebSocket message error:', error);
-        ws.send(JSON.stringify({ error: 'Invalid message format' }));
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
       }
     });
 
@@ -43,6 +46,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       connections.delete(ws);
       console.log('WebSocket connection closed');
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket connection error:', error);
+    });
+
+    // Keep connection alive with ping/pong
+    ws.on('pong', () => {
+      // Connection is alive
     });
   });
 

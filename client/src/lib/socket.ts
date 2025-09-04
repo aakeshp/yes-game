@@ -21,6 +21,10 @@ export class GameSocket {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
+          if (data.type === 'connection:ready') {
+            // Connection established successfully
+            return;
+          }
           this.emit(data.type, data.payload || data);
         } catch (error) {
           console.error('WebSocket message parse error:', error);
@@ -44,10 +48,12 @@ export class GameSocket {
       this.reconnectAttempts++;
       setTimeout(() => {
         console.log(`Attempting to reconnect... (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-        this.connect().catch(() => {
-          // Reconnect will be attempted again on close
+        this.connect().catch((error) => {
+          console.error('Reconnection failed:', error);
         });
       }, this.reconnectDelay * this.reconnectAttempts);
+    } else {
+      console.error('Max reconnection attempts reached');
     }
   }
 
