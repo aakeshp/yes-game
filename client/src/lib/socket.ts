@@ -20,10 +20,13 @@ export class GameSocket {
 
       this.ws.onopen = () => {
         console.log('WebSocket connected');
+        const wasReconnecting = this.reconnectAttempts > 0;
         this.reconnectAttempts = 0;
         
         // Auto-rejoin session after reconnection
-        this.recoverSession();
+        if (wasReconnecting) {
+          this.recoverSession();
+        }
         
         resolve();
       };
@@ -85,8 +88,13 @@ export class GameSocket {
   }
 
   private recoverSession() {
-    if (this.lastSessionId && this.reconnectAttempts > 0) {
-      // Only auto-recover if this is a reconnection (not initial connection)
+    console.log('Session recovery triggered:', {
+      lastSessionId: this.lastSessionId,
+      isAdmin: this.isAdmin,
+      hasParticipantData: !!(this.lastParticipantId || this.lastDisplayName)
+    });
+    
+    if (this.lastSessionId) {
       setTimeout(() => {
         if (this.isAdmin) {
           console.log('Auto-recovering admin session');

@@ -161,7 +161,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const connection = connections.get(ws);
       if (!connection?.sessionId || !connection?.participantId) {
-        console.log('Submit failed: not connected to session');
+        console.log(`Submit failed: not connected to session. Connection state: sessionId=${connection?.sessionId}, participantId=${connection?.participantId}`);
         ws.send(JSON.stringify({ type: 'error', message: 'Not connected to a session' }));
         return;
       }
