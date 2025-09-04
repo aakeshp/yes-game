@@ -31,12 +31,20 @@ export default function GameLobby() {
   const [gameCode, setGameCode] = useState("");
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [hasJoinedGame, setHasJoinedGame] = useState(false);
+  const [isGameCodeChanged, setIsGameCodeChanged] = useState(false);
 
-  // Load player name from localStorage
+  // Load saved data from localStorage
   useEffect(() => {
     const savedName = localStorage.getItem("playerName");
+    const savedGameCode = localStorage.getItem("currentGameCode");
+    
     if (savedName) {
       setPlayerName(savedName);
+    }
+    
+    if (savedGameCode) {
+      setGameCode(savedGameCode);
+      setHasJoinedGame(true);
     }
   }, []);
 
@@ -80,11 +88,36 @@ export default function GameLobby() {
       localStorage.setItem("playerName", playerName);
       localStorage.setItem(`participantId_${gameCode}`, ""); // Will be set when we join a session
       
-      // Join the game (this will trigger data fetching)
+      // Clear previous game data if switching
+      if (isGameCodeChanged) {
+        const oldGameCode = localStorage.getItem("currentGameCode");
+        if (oldGameCode) {
+          localStorage.removeItem(`participantId_${oldGameCode}`);
+        }
+        // Reset state for new game
+        setCurrentGameId(null);
+      }
+      
+      // Join/switch to the game (this will trigger data fetching)
+      localStorage.setItem("currentGameCode", gameCode);
       setHasJoinedGame(true);
+      setIsGameCodeChanged(false);
     } catch (error) {
       toast({ title: "Error", description: "Failed to join game", variant: "destructive" });
     }
+  };
+
+  const handleLeaveGame = () => {
+    localStorage.removeItem("currentGameCode");
+    const oldGameCode = gameCode;
+    if (oldGameCode) {
+      localStorage.removeItem(`participantId_${oldGameCode}`);
+    }
+    setGameCode("");
+    setHasJoinedGame(false);
+    setIsGameCodeChanged(false);
+    setCurrentGameId(null);
+    toast({ title: "Success", description: "Left the game" });
   };
 
   const handleJoinSession = async (session: Session) => {
@@ -192,17 +225,25 @@ export default function GameLobby() {
                     type="text"
                     placeholder="Enter 6-digit code"
                     value={gameCode}
-                    onChange={(e) => setGameCode(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      const newCode = e.target.value.toUpperCase();
+                      setGameCode(newCode);
+                      const savedGameCode = localStorage.getItem("currentGameCode");
+                      setIsGameCodeChanged(hasJoinedGame && newCode !== savedGameCode);
+                    }}
                     className="flex-1"
-                    disabled={hasJoinedGame}
+                    disabled={false}
                     data-testid="input-game-code"
                   />
                   <Button 
                     onClick={handleJoinGame} 
-                    disabled={gameLoading || hasJoinedGame || !playerName.trim() || !gameCode.trim()} 
+                    disabled={gameLoading || (hasJoinedGame && !isGameCodeChanged) || !playerName.trim() || !gameCode.trim()} 
                     data-testid="button-join"
                   >
-                    {gameLoading ? "Joining..." : hasJoinedGame ? "Joined" : "Join Game"}
+                    {gameLoading ? "Joining..." : 
+                     hasJoinedGame && !isGameCodeChanged ? "Joined" : 
+                     hasJoinedGame && isGameCodeChanged ? "Switch Game" :
+                     "Join Game"}
                   </Button>
                 </div>
               </div>
@@ -211,9 +252,23 @@ export default function GameLobby() {
             {/* Game Info */}
             {game && hasJoinedGame && (
               <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
-                <h3 className="font-semibold text-foreground mb-1" data-testid="text-game-name">✅ Joined: {game.name}</h3>
-                <p className="text-sm text-muted-foreground">Game Code: {game.code}</p>
-                <p className="text-sm text-primary mt-1">You can now join available sessions below</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-foreground mb-1" data-testid="text-game-name">✅ Joined: {game.name}</h3>
+                    <p className="text-sm text-muted-foreground">Game Code: {game.code}</p>
+                    <p className="text-sm text-primary mt-1">
+                      {isGameCodeChanged ? "Enter different code above to switch games" : "You can now join available sessions below"}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleLeaveGame}
+                    data-testid="button-leave-game"
+                  >
+                    Leave Game
+                  </Button>
+                </div>
               </div>
             )}
             
