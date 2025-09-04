@@ -136,20 +136,12 @@ export default function AdminLeaderboard() {
                   <div className="text-sm text-muted-foreground">Participants</div>
                 </div>
                 {gameData.leaderboard.length > 0 && (
-                  <>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-yellow-500">
-                        {Math.max(...gameData.leaderboard.map(p => p.totalPoints))}
-                      </div>
-                      <div className="text-sm text-muted-foreground">High Score</div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-yellow-500">
+                      {Math.max(...gameData.leaderboard.map(p => p.totalPoints))}
                     </div>
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-secondary">
-                        {Math.max(...gameData.leaderboard.map(p => p.sessionsPlayed))}
-                      </div>
-                      <div className="text-sm text-muted-foreground">Max Sessions</div>
-                    </div>
-                  </>
+                    <div className="text-sm text-muted-foreground">High Score</div>
+                  </div>
                 )}
               </div>
             </div>
