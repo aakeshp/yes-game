@@ -412,79 +412,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const participants = await storage.getParticipantsByGameId(req.params.gameId);
       const sessions = await storage.getSessionsByGameId(req.params.gameId);
       
-      // Generate CSV content
+      // Get all closed sessions and sort by creation date
+      const closedSessions = sessions
+        .filter(s => s.status === 'closed')
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      
+      // Generate CSV content organized by session
       const csvRows = [];
       
-      // CSV Headers
-      csvRows.push('Participant Name,Total Points,Sessions Played,Session Question,Session Points,Vote,Guess,Actual Yes Count,Session Status,Session Date');
+      // Build dynamic headers with participant names
+      const participantNames = participants.map(p => p.displayName).sort();
+      const baseHeaders = ['Session Date', 'Session Question', 'Actual Yes Count', 'Total Participants'];
       
-      for (const participant of participants) {
-        const participantSessions = [];
-
-        // Get all closed sessions and sort by creation date to show chronological progression
-        const closedSessions = sessions
-          .filter(s => s.status === 'closed')
-          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-
-        for (const session of closedSessions) {
-          const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
-          const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
-          const submission = await storage.getSubmission(session.id, participant.id);
+      // Add columns for each participant: Vote, Guess, Points
+      const participantHeaders = [];
+      participantNames.forEach(name => {
+        participantHeaders.push(`${name} Vote`);
+        participantHeaders.push(`${name} Guess`);
+        participantHeaders.push(`${name} Points`);
+      });
+      
+      csvRows.push([...baseHeaders, ...participantHeaders].join(','));
+      
+      // Generate rows for each session
+      for (const session of closedSessions) {
+        const allSubmissions = await storage.getSubmissionsBySessionId(session.id);
+        const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
+        const actualYesCount = allSubmissions.filter(s => s.vote === 'YES').length;
+        
+        const sessionDate = session.endedAt 
+          ? new Date(session.endedAt).toISOString().split('T')[0]
+          : new Date(session.createdAt).toISOString().split('T')[0];
           
-          if (participantPoints) {
-            // Calculate actual yes count for this session
-            const allSubmissions = await storage.getSubmissionsBySessionId(session.id);
-            const actualYesCount = allSubmissions.filter(s => s.vote === 'YES').length;
+        const row = [
+          sessionDate,
+          `"${session.question}"`,
+          actualYesCount,
+          allSubmissions.length
+        ];
+        
+        // Add data for each participant in consistent order
+        participantNames.forEach(participantName => {
+          const participant = participants.find(p => p.displayName === participantName);
+          if (participant) {
+            const submission = allSubmissions.find(s => s.participantId === participant.id);
+            const pointsRecord = sessionPointsRecords.find(sp => sp.participantId === participant.id);
             
-            participantSessions.push({
-              question: session.question,
-              points: participantPoints.points,
-              vote: submission?.vote || 'No Vote',
-              guess: submission?.guessYesCount || 'No Guess',
-              actualYesCount,
-              status: session.status,
-              date: session.endedAt || session.createdAt
-            });
+            row.push(submission?.vote || 'No Vote');
+            row.push(submission?.guessYesCount?.toString() || 'No Guess');
+            row.push(pointsRecord?.points?.toString() || '0');
+          } else {
+            row.push('N/A');
+            row.push('N/A');
+            row.push('0');
           }
-        }
-
-        // Add rows for this participant with cumulative totals
-        if (participantSessions.length > 0) {
-          let cumulativePoints = 0;
-          participantSessions.forEach((session, index) => {
-            cumulativePoints += session.points;
-            const sessionsPlayedSoFar = index + 1;
-            
-            const row = [
-              `"${participant.displayName}"`,
-              cumulativePoints, // Running total up to this session
-              sessionsPlayedSoFar, // Number of sessions played up to this point
-              `"${session.question}"`,
-              session.points, // Points earned in this specific session
-              session.vote,
-              session.guess,
-              session.actualYesCount,
-              session.status,
-              session.date ? new Date(session.date).toISOString().split('T')[0] : 'N/A'
-            ].join(',');
-            csvRows.push(row);
-          });
-        } else {
-          // Participant with no completed sessions
-          const row = [
-            `"${participant.displayName}"`,
-            0,
-            0,
-            'No completed sessions',
-            0,
-            'N/A',
-            'N/A',
-            'N/A',
-            'N/A',
-            'N/A'
-          ].join(',');
-          csvRows.push(row);
-        }
+        });
+        
+        csvRows.push(row.join(','));
       }
 
       const csvContent = csvRows.join('\n');
