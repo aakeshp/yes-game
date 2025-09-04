@@ -342,6 +342,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/games/:gameId/detailed-leaderboard', async (req, res) => {
+    try {
+      const game = await storage.getGame(req.params.gameId);
+      if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+
+      const participants = await storage.getParticipantsByGameId(req.params.gameId);
+      const sessions = await storage.getSessionsByGameId(req.params.gameId);
+      
+      const leaderboard = [];
+
+      for (const participant of participants) {
+        const sessionBreakdown = [];
+        let totalPoints = 0;
+        let sessionsPlayed = 0;
+
+        for (const session of sessions) {
+          if (session.status === 'closed') {
+            const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
+            const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
+            
+            if (participantPoints) {
+              sessionBreakdown.push({
+                sessionId: session.id,
+                question: session.question,
+                points: participantPoints.points,
+                status: session.status
+              });
+              totalPoints += participantPoints.points;
+              sessionsPlayed++;
+            }
+          }
+        }
+
+        leaderboard.push({
+          participantId: participant.id,
+          displayName: participant.displayName,
+          totalPoints,
+          sessionsPlayed,
+          sessionBreakdown
+        });
+      }
+
+      // Sort by total points descending
+      leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
+
+      res.json({
+        id: game.id,
+        name: game.name,
+        code: game.code,
+        leaderboard
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch detailed leaderboard' });
+    }
+  });
+
   app.get('/api/games/code/:code', async (req, res) => {
     try {
       const game = await storage.getGameByCode(req.params.code);

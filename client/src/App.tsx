@@ -10,6 +10,7 @@ import Results from "@/pages/results";
 import AdminConsole from "@/pages/admin-console";
 import AdminLiveView from "@/pages/admin-live-view";
 import AdminSetup from "@/pages/admin-setup";
+import AdminLeaderboard from "@/pages/admin-leaderboard";
 
 function Router() {
   return (
@@ -20,6 +21,7 @@ function Router() {
       <Route path="/results/:sessionId" component={Results} />
       <Route path="/admin/setup" component={AdminSetup} />
       <Route path="/admin/games/:gameId" component={AdminConsole} />
+      <Route path="/admin/games/:gameId/leaderboard" component={AdminLeaderboard} />
       <Route path="/admin/sessions/:sessionId" component={AdminLiveView} />
       <Route component={NotFound} />
     </Switch>

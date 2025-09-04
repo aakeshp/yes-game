@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, Play, RotateCcw, ExternalLink, Copy } from "lucide-react";
+import { Settings, Play, RotateCcw, ExternalLink, Copy, Users } from "lucide-react";
 
 interface Session {
   id: string;
@@ -151,10 +151,9 @@ export default function AdminConsole() {
     restartSessionMutation.mutate(sessionId);
   };
 
-  const handlePlayAsParticipant = () => {
+  const handleViewLeaderboard = () => {
     if (game) {
-      const playUrl = `${window.location.origin}/play/${game.code}`;
-      window.open(playUrl, '_blank');
+      navigate(`/admin/games/${game.id}/leaderboard`);
     }
   };
 
@@ -300,16 +299,12 @@ export default function AdminConsole() {
                 <h3 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h3>
                 <div className="space-y-3">
                   <Button 
-                    onClick={handlePlayAsParticipant}
+                    onClick={handleViewLeaderboard}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
-                    data-testid="button-play-participant"
+                    data-testid="button-view-leaderboard"
                   >
-                    <Play className="w-4 h-4 mr-2" />
-                    Play as Participant
-                  </Button>
-                  <Button variant="outline" className="w-full" data-testid="button-switch-view">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Switch: Admin ↔ Player
+                    <Users className="w-4 h-4 mr-2" />
+                    View Leaderboard
                   </Button>
                   <Button variant="outline" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" data-testid="button-export">
                     📊 Export Results
