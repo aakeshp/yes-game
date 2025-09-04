@@ -39,6 +39,7 @@ export default function AdminConsole() {
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const [editQuestion, setEditQuestion] = useState("");
   const [editTimer, setEditTimer] = useState("30");
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   // Check if admin is authenticated
   const adminId = localStorage.getItem("adminId");
@@ -203,11 +204,20 @@ export default function AdminConsole() {
     );
   };
 
-  const getCurrentDraftSession = () => {
-    return sessions?.find((s: Session) => s.status === 'draft');
-  };
-
-  const currentDraftSession = getCurrentDraftSession();
+  // Get all draft sessions
+  const draftSessions = sessions?.filter((s: Session) => s.status === 'draft') || [];
+  
+  // Get selected session or auto-select first draft session
+  const selectedSession = selectedSessionId 
+    ? draftSessions.find(s => s.id === selectedSessionId) 
+    : draftSessions[0] || null;
+  
+  // Auto-select first draft session if none selected and sessions exist
+  useEffect(() => {
+    if (!selectedSessionId && draftSessions.length > 0) {
+      setSelectedSessionId(draftSessions[0].id);
+    }
+  }, [selectedSessionId, draftSessions]);
   const hasLiveSession = sessions?.some((s: Session) => s.status === 'live');
 
   if (!game) {
@@ -376,18 +386,18 @@ export default function AdminConsole() {
                   <CardTitle>Session Control</CardTitle>
                   <div className="flex space-x-3">
                     <Button
-                      onClick={() => currentDraftSession && handleStartSession(currentDraftSession.id)}
-                      disabled={!currentDraftSession || startSessionMutation.isPending}
+                      onClick={() => selectedSession && handleStartSession(selectedSession.id)}
+                      disabled={!selectedSession || startSessionMutation.isPending}
                       className="bg-primary text-primary-foreground hover:bg-primary/90"
                       data-testid="button-start-session"
                     >
                       <Play className="w-4 h-4 mr-1" />
-                      {startSessionMutation.isPending ? "Starting..." : "Start Session"}
+                      {startSessionMutation.isPending ? "Starting..." : "Start Selected Session"}
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={() => currentDraftSession && handleRestartSession(currentDraftSession.id)}
-                      disabled={!currentDraftSession || restartSessionMutation.isPending}
+                      onClick={() => selectedSession && handleRestartSession(selectedSession.id)}
+                      disabled={!selectedSession || restartSessionMutation.isPending}
                       data-testid="button-restart-session"
                     >
                       <RotateCcw className="w-4 h-4 mr-1" />
@@ -397,24 +407,46 @@ export default function AdminConsole() {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Current Session Info */}
-                {currentDraftSession && (
-                  <div className="bg-muted rounded-lg p-4 mb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h4 className="font-medium text-foreground mb-1" data-testid="text-current-session-question">
-                          {currentDraftSession.question}
-                        </h4>
-                        <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                          <span>Timer: <span data-testid="text-current-session-timer">{currentDraftSession.timerSeconds}s</span></span>
-                          {getStatusBadge(currentDraftSession.status)}
+                {/* Session Selection */}
+                {draftSessions.length > 0 && (
+                  <div className="mb-4">
+                    <h4 className="font-medium text-foreground mb-3">Select Session to Start:</h4>
+                    <div className="space-y-2">
+                      {draftSessions.map((session) => (
+                        <div 
+                          key={session.id}
+                          className={`p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedSessionId === session.id 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-border bg-muted hover:bg-muted/80'
+                          }`}
+                          onClick={() => setSelectedSessionId(session.id)}
+                          data-testid={`session-option-${session.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <h5 className="font-medium text-foreground mb-1">
+                                {session.question}
+                              </h5>
+                              <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                                <span>Timer: {session.timerSeconds}s</span>
+                                {getStatusBadge(session.status)}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">Participants</div>
+                              <div className="text-lg font-semibold text-primary">0</div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm text-muted-foreground">Participants</div>
-                        <div className="text-xl font-bold text-primary">0</div>
-                      </div>
+                      ))}
                     </div>
+                  </div>
+                )}
+                
+                {draftSessions.length === 0 && (
+                  <div className="bg-muted rounded-lg p-4 mb-4 text-center">
+                    <p className="text-muted-foreground">No draft sessions available. Create a session to get started.</p>
                   </div>
                 )}
 
