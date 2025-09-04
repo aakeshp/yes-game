@@ -27,6 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
+        console.log('WebSocket message received:', data);
         await handleWebSocketMessage(ws, data);
       } catch (error) {
         console.error('WebSocket message error:', error);
