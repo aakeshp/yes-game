@@ -415,7 +415,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get all closed sessions and sort by creation date
       const closedSessions = sessions
         .filter(s => s.status === 'closed')
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        .sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateA - dateB;
+        });
       
       // Generate CSV content organized by session
       const csvRows = [];
@@ -425,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const baseHeaders = ['Session Date', 'Session Question', 'Actual Yes Count', 'Total Participants'];
       
       // Add columns for each participant: Vote, Guess, Points
-      const participantHeaders = [];
+      const participantHeaders: string[] = [];
       participantNames.forEach(name => {
         participantHeaders.push(`${name} Vote`);
         participantHeaders.push(`${name} Guess`);
@@ -442,7 +446,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const sessionDate = session.endedAt 
           ? new Date(session.endedAt).toISOString().split('T')[0]
-          : new Date(session.createdAt).toISOString().split('T')[0];
+          : (session.createdAt ? new Date(session.createdAt).toISOString().split('T')[0] : 'Unknown');
           
         const row = [
           sessionDate,
