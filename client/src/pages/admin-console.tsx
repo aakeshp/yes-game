@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, Play, RotateCcw, ExternalLink, Copy, Users } from "lucide-react";
+import { Settings, Play, ExternalLink, Copy, Users } from "lucide-react";
 
 interface Session {
   id: string;
@@ -118,19 +118,6 @@ export default function AdminConsole() {
     }
   });
 
-  const restartSessionMutation = useMutation({
-    mutationFn: async (sessionId: string) => {
-      const response = await apiRequest("POST", `/api/sessions/${sessionId}/restart`);
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/games", gameId, "sessions"] });
-      toast({ title: "Success", description: "Session restarted successfully" });
-    },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to restart session", variant: "destructive" });
-    }
-  });
 
   const handleCreateSession = () => {
     if (!newQuestion.trim()) {
@@ -147,9 +134,6 @@ export default function AdminConsole() {
     startSessionMutation.mutate(sessionId);
   };
 
-  const handleRestartSession = (sessionId: string) => {
-    restartSessionMutation.mutate(sessionId);
-  };
 
   const handleViewLeaderboard = () => {
     if (game) {
@@ -413,15 +397,6 @@ export default function AdminConsole() {
                     >
                       <Play className="w-4 h-4 mr-1" />
                       {startSessionMutation.isPending ? "Starting..." : "Start Selected Session"}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={() => selectedSession && handleRestartSession(selectedSession.id)}
-                      disabled={!selectedSession || restartSessionMutation.isPending}
-                      data-testid="button-restart-session"
-                    >
-                      <RotateCcw className="w-4 h-4 mr-1" />
-                      {restartSessionMutation.isPending ? "Restarting..." : "Restart"}
                     </Button>
                   </div>
                 </div>

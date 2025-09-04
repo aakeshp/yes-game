@@ -704,31 +704,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/sessions/:sessionId/restart', async (req, res) => {
-    try {
-      const session = await storage.getSession(req.params.sessionId);
-      if (!session) {
-        res.status(404).json({ error: 'Session not found' });
-        return;
-      }
-
-      const submissions = await storage.getSubmissionsBySessionId(req.params.sessionId);
-      if (submissions.length > 0) {
-        res.status(400).json({ error: 'Cannot restart session with existing submissions' });
-        return;
-      }
-
-      const newSession = await storage.createSession({
-        gameId: session.gameId,
-        question: session.question,
-        timerSeconds: session.timerSeconds
-      });
-
-      res.json({ sessionId: newSession.id });
-    } catch (error) {
-      res.status(500).json({ error: 'Failed to restart session' });
-    }
-  });
 
   app.get('/api/games/:gameId/sessions', async (req, res) => {
     try {
