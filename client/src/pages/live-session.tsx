@@ -41,6 +41,8 @@ export default function LiveSession() {
   const [vote, setVote] = useState<"YES" | "NO" | "">("");
   const [guess, setGuess] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [hasChangedSinceSubmit, setHasChangedSinceSubmit] = useState(false);
 
   // Extract session ID from URL
   useEffect(() => {
@@ -75,6 +77,8 @@ export default function LiveSession() {
       if (data.currentSubmission) {
         setVote(data.currentSubmission.vote || "");
         setGuess(data.currentSubmission.guessYesCount?.toString() || "");
+        setHasSubmitted(true);
+        setHasChangedSinceSubmit(false);
       }
       
       if (data.session.endsAt) {
@@ -99,6 +103,8 @@ export default function LiveSession() {
     const handleSubmitted = (data: any) => {
       setCurrentSubmission(data.submission);
       setIsSubmitting(false);
+      setHasSubmitted(true);
+      setHasChangedSinceSubmit(false);
       toast({ title: "Success", description: "Your submission has been saved" });
     };
 
@@ -125,7 +131,11 @@ export default function LiveSession() {
   }, [socket, sessionId, navigate, toast]);
 
   const handleVoteClick = (selectedVote: "YES" | "NO") => {
-    setVote(vote === selectedVote ? "" : selectedVote);
+    const newVote = vote === selectedVote ? "" : selectedVote;
+    setVote(newVote);
+    if (hasSubmitted) {
+      setHasChangedSinceSubmit(true);
+    }
   };
 
   const handleSubmit = () => {
@@ -273,22 +283,33 @@ export default function LiveSession() {
                     min="0"
                     placeholder="Enter your guess"
                     value={guess}
-                    onChange={(e) => setGuess(e.target.value)}
+                    onChange={(e) => {
+                      setGuess(e.target.value);
+                      if (hasSubmitted) {
+                        setHasChangedSinceSubmit(true);
+                      }
+                    }}
                     className="flex-1 text-center text-lg"
                     disabled={session.status !== 'live'}
                     data-testid="input-guess"
                   />
                   <Button
                     onClick={handleSubmit}
-                    disabled={session.status !== 'live' || isSubmitting}
-                    className="bg-accent text-accent-foreground hover:bg-accent/90"
+                    disabled={session.status !== 'live' || isSubmitting || (hasSubmitted && !hasChangedSinceSubmit)}
+                    className={`${hasSubmitted && !hasChangedSinceSubmit ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground hover:bg-accent/90'}`}
                     data-testid="button-submit"
                   >
-                    {isSubmitting ? "Submitting..." : "Submit"}
+                    {isSubmitting ? "Submitting..." : 
+                     hasSubmitted && !hasChangedSinceSubmit ? "Submitted ✓" :
+                     hasSubmitted && hasChangedSinceSubmit ? "Update Submission" :
+                     "Submit"}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  You can update your vote and guess until the timer expires
+                  {hasSubmitted && !hasChangedSinceSubmit 
+                    ? "Submission saved! You can still change your vote/guess if needed."
+                    : "You can update your vote and guess until the timer expires"
+                  }
                 </p>
               </div>
             </div>
