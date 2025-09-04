@@ -38,6 +38,7 @@ interface Game {
 interface SessionWithResults {
   id: string;
   gameId: string;
+  status: string;
   results?: SessionResults;
 }
 
@@ -57,9 +58,10 @@ export default function Results() {
   const { data: session, isLoading, refetch } = useQuery<SessionWithResults>({
     queryKey: ["/api/sessions", sessionId],
     enabled: !!sessionId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
       // Keep refetching every 2 seconds if we don't have results yet
-      return data?.results ? false : 2000;
+      const sessionData = query.state.data;
+      return sessionData?.results ? false : 2000;
     },
     refetchIntervalInBackground: false,
   });
