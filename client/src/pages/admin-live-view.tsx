@@ -48,12 +48,19 @@ export default function AdminLiveView() {
     enabled: !!sessionId,
   });
 
-  // Join as admin when connected
+  // Join as admin when connected (only once per session)
   useEffect(() => {
-    if (isConnected && sessionId) {
+    if (isConnected && sessionId && !session) {
       joinAsAdmin(sessionId);
     }
-  }, [isConnected, sessionId, joinAsAdmin]);
+  }, [isConnected, sessionId]); // Removed joinAsAdmin dependency to prevent infinite loops
+
+  // Clean up session state when leaving
+  useEffect(() => {
+    return () => {
+      socket.clearSession();
+    };
+  }, [socket]);
 
   // WebSocket event listeners
   useEffect(() => {

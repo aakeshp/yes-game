@@ -4,6 +4,12 @@ export class GameSocket {
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
+  
+  // Session recovery state
+  private lastSessionId: string | null = null;
+  private lastParticipantId: string | null = null;
+  private lastDisplayName: string | null = null;
+  private isAdmin: boolean = false;
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -15,6 +21,10 @@ export class GameSocket {
       this.ws.onopen = () => {
         console.log('WebSocket connected');
         this.reconnectAttempts = 0;
+        
+        // Auto-rejoin session after reconnection
+        this.recoverSession();
+        
         resolve();
       };
 
@@ -60,6 +70,36 @@ export class GameSocket {
   send(type: string, payload?: any) {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify({ type, payload }));
+      
+      // Store session info for recovery
+      if (type === 'session:join' && payload) {
+        this.lastSessionId = payload.sessionId;
+        this.lastParticipantId = payload.participantId;
+        this.lastDisplayName = payload.displayName;
+        this.isAdmin = false;
+      } else if (type === 'admin:join' && payload) {
+        this.lastSessionId = payload.sessionId;
+        this.isAdmin = true;
+      }
+    }
+  }
+
+  private recoverSession() {
+    if (this.lastSessionId && this.reconnectAttempts > 0) {
+      // Only auto-recover if this is a reconnection (not initial connection)
+      setTimeout(() => {
+        if (this.isAdmin) {
+          console.log('Auto-recovering admin session');
+          this.send('admin:join', { sessionId: this.lastSessionId });
+        } else if (this.lastSessionId && (this.lastParticipantId || this.lastDisplayName)) {
+          console.log('Auto-recovering participant session');
+          this.send('session:join', { 
+            sessionId: this.lastSessionId, 
+            participantId: this.lastParticipantId,
+            displayName: this.lastDisplayName
+          });
+        }
+      }, 100); // Small delay to ensure connection is ready
     }
   }
 
@@ -90,6 +130,15 @@ export class GameSocket {
       this.ws = null;
     }
     this.listeners.clear();
+    // Don't clear session state - keep it for potential reconnection
+  }
+
+  clearSession() {
+    // Call this when truly leaving a session (not just disconnecting)
+    this.lastSessionId = null;
+    this.lastParticipantId = null;
+    this.lastDisplayName = null;
+    this.isAdmin = false;
   }
 }
 

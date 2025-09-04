@@ -52,7 +52,7 @@ export default function LiveSession() {
     }
   }, [location]);
 
-  // Join session when connected (only once per session)
+  // Join session when connected
   useEffect(() => {
     if (isConnected && sessionId && !participant) {
       const playerName = localStorage.getItem("playerName");
@@ -64,6 +64,13 @@ export default function LiveSession() {
       }
     }
   }, [isConnected, sessionId]); // Removed joinSession dependency to prevent infinite loops
+
+  // Clean up session state when leaving
+  useEffect(() => {
+    return () => {
+      socket.clearSession();
+    };
+  }, [socket]);
 
   // WebSocket event listeners
   useEffect(() => {
