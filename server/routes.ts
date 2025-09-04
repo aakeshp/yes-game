@@ -74,15 +74,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Check join cutoff for live sessions
-      if (session.status === 'live' && session.endsAt) {
-        const timeRemaining = session.endsAt.getTime() - Date.now();
-        if (timeRemaining < 10000) { // 10 seconds
-          ws.send(JSON.stringify({ type: 'error', message: 'Joining closed - less than 10 seconds remaining' }));
-          return;
-        }
-      }
-
       let participant;
       if (participantId) {
         participant = await storage.getParticipant(participantId);
@@ -102,6 +93,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
+      // Check if this is an existing participant with a submission
+      const existingSubmission = await storage.getSubmission(sessionId, participant.id);
+      const isExistingParticipant = !!existingSubmission;
+
+      // Apply 10-second join cutoff only to NEW participants, not existing ones
+      if (session.status === 'live' && session.endsAt && !isExistingParticipant) {
+        const timeRemaining = session.endsAt.getTime() - Date.now();
+        if (timeRemaining < 10000) { // 10 seconds
+          ws.send(JSON.stringify({ type: 'error', message: 'Joining closed - less than 10 seconds remaining' }));
+          return;
+        }
+      }
+
       // Update connection
       connection.sessionId = sessionId;
       connection.participantId = participant.id;
@@ -112,9 +116,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       sessionRooms.get(sessionId)!.add(ws);
 
-      // Get current submission
-      const submission = await storage.getSubmission(sessionId, participant.id);
-
       // Send join response
       ws.send(JSON.stringify({
         type: 'session:joined',
@@ -123,7 +124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           participantId: participant.id,
           participant,
           session,
-          currentSubmission: submission
+          currentSubmission: existingSubmission
         }
       }));
 
