@@ -52,9 +52,9 @@ export default function LiveSession() {
     }
   }, [location]);
 
-  // Join session when connected
+  // Join session when connected (only once per session)
   useEffect(() => {
-    if (isConnected && sessionId) {
+    if (isConnected && sessionId && !participant) {
       const playerName = localStorage.getItem("playerName");
       const gameCode = new URLSearchParams(window.location.search).get("game") || "";
       const participantId = localStorage.getItem(`participantId_${gameCode}`);
@@ -63,7 +63,7 @@ export default function LiveSession() {
         joinSession(sessionId, participantId || undefined, playerName);
       }
     }
-  }, [isConnected, sessionId, joinSession]);
+  }, [isConnected, sessionId]); // Removed joinSession dependency to prevent infinite loops
 
   // WebSocket event listeners
   useEffect(() => {

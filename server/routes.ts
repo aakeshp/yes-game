@@ -30,7 +30,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('message', async (message) => {
       try {
         const data = JSON.parse(message.toString());
-        console.log('WebSocket message received:', data);
+        // console.log('WebSocket message received:', data);
         await handleWebSocketMessage(ws, data);
       } catch (error) {
         console.error('WebSocket message error:', error);
@@ -81,7 +81,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const connection = connections.get(ws);
       if (!connection) return;
       
-      console.log(`Session join attempt: sessionId=${sessionId}, participantId=${participantId}, displayName=${displayName}`);
+      // console.log(`Session join attempt: sessionId=${sessionId}, participantId=${participantId}, displayName=${displayName}`);
 
       const session = await storage.getSession(sessionId);
       if (!session) {
@@ -112,19 +112,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingSubmission = await storage.getSubmission(sessionId, participant.id);
       const isExistingParticipant = !!existingSubmission;
 
-      console.log(`Participant check: participantId=${participant.id}, hasExistingSubmission=${isExistingParticipant}`);
-
       // Apply 10-second join cutoff only to NEW participants, not existing ones
       if (session.status === 'live' && session.endsAt && !isExistingParticipant) {
         const timeRemaining = session.endsAt.getTime() - Date.now();
-        console.log(`New participant join check: timeRemaining=${timeRemaining}ms`);
         if (timeRemaining < 10000) { // 10 seconds
-          console.log('Blocking new participant - less than 10 seconds remaining');
           ws.send(JSON.stringify({ type: 'error', message: 'Joining closed - less than 10 seconds remaining' }));
           return;
         }
-      } else if (isExistingParticipant) {
-        console.log('Allowing existing participant to rejoin/reconnect');
       }
 
       // Update connection
@@ -172,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
       
-      console.log(`Vote submit attempt: sessionId=${connection.sessionId}, participantId=${connection.participantId}, vote=${payload.vote}, guess=${payload.guessYesCount}`);
+      console.log(`Vote submit: sessionId=${connection.sessionId}, participantId=${connection.participantId}, vote=${payload.vote}, guess=${payload.guessYesCount}`);
 
       const session = await storage.getSession(connection.sessionId);
       if (!session || session.status !== 'live') {
