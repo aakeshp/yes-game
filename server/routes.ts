@@ -401,6 +401,103 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/games/:gameId/export', async (req, res) => {
+    try {
+      const game = await storage.getGame(req.params.gameId);
+      if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+
+      const participants = await storage.getParticipantsByGameId(req.params.gameId);
+      const sessions = await storage.getSessionsByGameId(req.params.gameId);
+      
+      // Generate CSV content
+      const csvRows = [];
+      
+      // CSV Headers
+      csvRows.push('Participant Name,Total Points,Sessions Played,Session Question,Session Points,Vote,Guess,Actual Yes Count,Session Status,Session Date');
+      
+      for (const participant of participants) {
+        let totalPoints = 0;
+        let sessionsPlayed = 0;
+        const participantSessions = [];
+
+        for (const session of sessions) {
+          if (session.status === 'closed') {
+            const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
+            const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
+            const submission = await storage.getSubmission(session.id, participant.id);
+            
+            if (participantPoints) {
+              // Calculate actual yes count for this session
+              const allSubmissions = await storage.getSubmissionsBySessionId(session.id);
+              const actualYesCount = allSubmissions.filter(s => s.vote === 'YES').length;
+              
+              participantSessions.push({
+                question: session.question,
+                points: participantPoints.points,
+                vote: submission?.vote || 'No Vote',
+                guess: submission?.guessYesCount || 'No Guess',
+                actualYesCount,
+                status: session.status,
+                date: session.endedAt || session.createdAt
+              });
+              
+              totalPoints += participantPoints.points;
+              sessionsPlayed++;
+            }
+          }
+        }
+
+        // Add rows for this participant
+        if (participantSessions.length > 0) {
+          participantSessions.forEach(session => {
+            const row = [
+              `"${participant.displayName}"`,
+              totalPoints,
+              sessionsPlayed,
+              `"${session.question}"`,
+              session.points,
+              session.vote,
+              session.guess,
+              session.actualYesCount,
+              session.status,
+              session.date ? new Date(session.date).toISOString().split('T')[0] : 'N/A'
+            ].join(',');
+            csvRows.push(row);
+          });
+        } else {
+          // Participant with no completed sessions
+          const row = [
+            `"${participant.displayName}"`,
+            0,
+            0,
+            'No completed sessions',
+            0,
+            'N/A',
+            'N/A',
+            'N/A',
+            'N/A',
+            'N/A'
+          ].join(',');
+          csvRows.push(row);
+        }
+      }
+
+      const csvContent = csvRows.join('\n');
+      const filename = `${game.name.replace(/[^a-zA-Z0-9]/g, '_')}_results_${new Date().toISOString().split('T')[0]}.csv`;
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.send(csvContent);
+      
+    } catch (error) {
+      console.error('Export error:', error);
+      res.status(500).json({ error: 'Failed to export game results' });
+    }
+  });
+
   app.get('/api/games/code/:code', async (req, res) => {
     try {
       const game = await storage.getGameByCode(req.params.code);

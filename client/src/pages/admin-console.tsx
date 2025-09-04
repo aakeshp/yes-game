@@ -157,6 +157,25 @@ export default function AdminConsole() {
     }
   };
 
+  const handleExportResults = () => {
+    if (game) {
+      const exportUrl = `/api/admin/games/${game.id}/export`;
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = exportUrl;
+      link.download = `${game.name}_results.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Export Started",
+        description: "Your game results are being downloaded as a CSV file.",
+        variant: "default"
+      });
+    }
+  };
+
   const handleCopyJoinLink = () => {
     if (game) {
       const joinUrl = `${window.location.origin}/play/${game.code}`;
@@ -306,7 +325,12 @@ export default function AdminConsole() {
                     <Users className="w-4 h-4 mr-2" />
                     View Leaderboard
                   </Button>
-                  <Button variant="outline" className="w-full bg-accent text-accent-foreground hover:bg-accent/90" data-testid="button-export">
+                  <Button 
+                    variant="outline" 
+                    className="w-full bg-accent text-accent-foreground hover:bg-accent/90" 
+                    onClick={handleExportResults}
+                    data-testid="button-export"
+                  >
                     📊 Export Results
                   </Button>
                 </div>
