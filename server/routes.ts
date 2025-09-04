@@ -419,46 +419,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
       csvRows.push('Participant Name,Total Points,Sessions Played,Session Question,Session Points,Vote,Guess,Actual Yes Count,Session Status,Session Date');
       
       for (const participant of participants) {
-        let totalPoints = 0;
-        let sessionsPlayed = 0;
         const participantSessions = [];
 
-        for (const session of sessions) {
-          if (session.status === 'closed') {
-            const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
-            const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
-            const submission = await storage.getSubmission(session.id, participant.id);
+        // Get all closed sessions and sort by creation date to show chronological progression
+        const closedSessions = sessions
+          .filter(s => s.status === 'closed')
+          .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+        for (const session of closedSessions) {
+          const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
+          const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
+          const submission = await storage.getSubmission(session.id, participant.id);
+          
+          if (participantPoints) {
+            // Calculate actual yes count for this session
+            const allSubmissions = await storage.getSubmissionsBySessionId(session.id);
+            const actualYesCount = allSubmissions.filter(s => s.vote === 'YES').length;
             
-            if (participantPoints) {
-              // Calculate actual yes count for this session
-              const allSubmissions = await storage.getSubmissionsBySessionId(session.id);
-              const actualYesCount = allSubmissions.filter(s => s.vote === 'YES').length;
-              
-              participantSessions.push({
-                question: session.question,
-                points: participantPoints.points,
-                vote: submission?.vote || 'No Vote',
-                guess: submission?.guessYesCount || 'No Guess',
-                actualYesCount,
-                status: session.status,
-                date: session.endedAt || session.createdAt
-              });
-              
-              totalPoints += participantPoints.points;
-              sessionsPlayed++;
-            }
+            participantSessions.push({
+              question: session.question,
+              points: participantPoints.points,
+              vote: submission?.vote || 'No Vote',
+              guess: submission?.guessYesCount || 'No Guess',
+              actualYesCount,
+              status: session.status,
+              date: session.endedAt || session.createdAt
+            });
           }
         }
 
-        // Add rows for this participant
+        // Add rows for this participant with cumulative totals
         if (participantSessions.length > 0) {
-          participantSessions.forEach(session => {
+          let cumulativePoints = 0;
+          participantSessions.forEach((session, index) => {
+            cumulativePoints += session.points;
+            const sessionsPlayedSoFar = index + 1;
+            
             const row = [
               `"${participant.displayName}"`,
-              totalPoints,
-              sessionsPlayed,
+              cumulativePoints, // Running total up to this session
+              sessionsPlayedSoFar, // Number of sessions played up to this point
               `"${session.question}"`,
-              session.points,
+              session.points, // Points earned in this specific session
               session.vote,
               session.guess,
               session.actualYesCount,
