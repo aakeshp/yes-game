@@ -133,6 +133,50 @@ export default function AdminLiveView() {
     navigate(`/results/${sessionId}`);
   };
 
+  const handleBackToAdmin = () => {
+    // Try multiple fallback options for robust navigation
+    if (session?.gameId) {
+      navigate(`/admin/games/${session.gameId}`);
+    } else if (sessionData?.gameId) {
+      navigate(`/admin/games/${sessionData.gameId}`);
+    } else {
+      // Fallback to admin setup if we can't determine the game ID
+      navigate('/admin/setup');
+      toast({
+        title: "Navigation Issue",
+        description: "Returned to admin setup due to lost game context",
+        variant: "default"
+      });
+    }
+  };
+
+  const handleEndSession = () => {
+    if (!sessionId) return;
+    
+    // Make API call to end the session early
+    fetch(`/api/sessions/${sessionId}/end`, { method: 'POST' })
+      .then(response => {
+        if (response.ok) {
+          toast({
+            title: "Session Ended",
+            description: "Session has been ended early",
+            variant: "default"
+          });
+          // Navigate back to admin after ending session
+          handleBackToAdmin();
+        } else {
+          throw new Error('Failed to end session');
+        }
+      })
+      .catch(error => {
+        toast({
+          title: "Error",
+          description: "Failed to end session",
+          variant: "destructive"
+        });
+      });
+  };
+
   if (!isConnected && !session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -172,7 +216,7 @@ export default function AdminLiveView() {
             <Button 
               variant="ghost" 
               size="sm" 
-              onClick={() => navigate(`/admin/games/${session.gameId}`)}
+              onClick={handleBackToAdmin}
               data-testid="button-back-admin"
             >
               Back to Admin Console
@@ -266,7 +310,20 @@ export default function AdminLiveView() {
           <CardContent>
             <div className="bg-muted rounded-lg p-4">
               <div className="flex items-center justify-center space-x-4">
-                <span className="text-muted-foreground">🔒 Controls disabled while session is live</span>
+                {session.status === 'live' ? (
+                  <>
+                    <Button 
+                      variant="destructive" 
+                      onClick={handleEndSession}
+                      data-testid="button-end-session"
+                    >
+                      End Session Early
+                    </Button>
+                    <span className="text-muted-foreground">⚠️ Session is live - end early if needed</span>
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">🔒 Controls disabled while session is live</span>
+                )}
               </div>
             </div>
           </CardContent>

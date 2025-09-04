@@ -461,6 +461,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/sessions/:sessionId/end', async (req, res) => {
+    try {
+      const session = await storage.getSession(req.params.sessionId);
+      if (!session || session.status !== 'live') {
+        res.status(400).json({ error: 'Can only end live sessions' });
+        return;
+      }
+
+      // Clear the timer if it exists
+      const timer = sessionTimers.get(req.params.sessionId);
+      if (timer) {
+        clearTimeout(timer);
+        sessionTimers.delete(req.params.sessionId);
+      }
+
+      // End the session
+      await endSession(req.params.sessionId);
+      
+      res.json({ success: true, message: 'Session ended successfully' });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to end session' });
+    }
+  });
+
   app.post('/api/sessions/:sessionId/restart', async (req, res) => {
     try {
       const session = await storage.getSession(req.params.sessionId);
