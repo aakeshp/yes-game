@@ -275,7 +275,7 @@ export class MemStorage implements IStorage {
         else if (error === 1) points = 3;
       }
 
-      // Store points
+      // Store points (always record participation, even if 0 points)
       await this.upsertSessionPoints(sessionId, submission.participantId, points);
 
       results.participants.push({
@@ -535,10 +535,8 @@ export class DatabaseStorage implements IStorage {
 
       const points = this.calculatePoints(submission.guessYesCount, yesVotes);
       
-      // Store points
-      if (points > 0) {
-        await this.upsertSessionPoints(sessionId, submission.participantId, points);
-      }
+      // Store points (always record participation, even if 0 points)
+      await this.upsertSessionPoints(sessionId, submission.participantId, points);
 
       participants.push({
         participantId: submission.participantId,
