@@ -67,6 +67,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { sessionId, participantId, displayName } = payload;
       const connection = connections.get(ws);
       if (!connection) return;
+      
+      console.log(`Session join attempt: sessionId=${sessionId}, participantId=${participantId}, displayName=${displayName}`);
 
       const session = await storage.getSession(sessionId);
       if (!session) {
@@ -97,13 +99,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const existingSubmission = await storage.getSubmission(sessionId, participant.id);
       const isExistingParticipant = !!existingSubmission;
 
+      console.log(`Participant check: participantId=${participant.id}, hasExistingSubmission=${isExistingParticipant}`);
+
       // Apply 10-second join cutoff only to NEW participants, not existing ones
       if (session.status === 'live' && session.endsAt && !isExistingParticipant) {
         const timeRemaining = session.endsAt.getTime() - Date.now();
+        console.log(`New participant join check: timeRemaining=${timeRemaining}ms`);
         if (timeRemaining < 10000) { // 10 seconds
+          console.log('Blocking new participant - less than 10 seconds remaining');
           ws.send(JSON.stringify({ type: 'error', message: 'Joining closed - less than 10 seconds remaining' }));
           return;
         }
+      } else if (isExistingParticipant) {
+        console.log('Allowing existing participant to rejoin/reconnect');
       }
 
       // Update connection
@@ -146,9 +154,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const connection = connections.get(ws);
       if (!connection?.sessionId || !connection?.participantId) {
+        console.log('Submit failed: not connected to session');
         ws.send(JSON.stringify({ type: 'error', message: 'Not connected to a session' }));
         return;
       }
+      
+      console.log(`Vote submit attempt: sessionId=${connection.sessionId}, participantId=${connection.participantId}, vote=${payload.vote}, guess=${payload.guessYesCount}`);
 
       const session = await storage.getSession(connection.sessionId);
       if (!session || session.status !== 'live') {
