@@ -69,14 +69,17 @@ export default function Results() {
     enabled: !!session?.gameId,
   });
 
-  const handleBackToLobby = () => {
+  const handleBackToLobby = async () => {
     // Invalidate relevant caches to ensure fresh data in lobby
     if (session?.gameId) {
-      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "sessions"] });
-      
-      // Also invalidate game-by-code queries that might be cached
-      queryClient.invalidateQueries({ queryKey: ["/api/games/code"] });
+      // More aggressive cache invalidation
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "sessions"] }),
+        queryClient.invalidateQueries({ queryKey: ["/api/games/code"] }),
+        // Also clear any cached game data to force fresh fetch
+        queryClient.removeQueries({ queryKey: ["/api/games", session.gameId] }),
+      ]);
     }
     navigate("/");
   };
