@@ -132,6 +132,7 @@ export class MemStorage implements IStorage {
       startedAt: null,
       endsAt: null,
       endedAt: null,
+      resultsCalculated: false,
       createdAt: new Date() 
     };
     this.sessions.set(id, session);
@@ -542,11 +543,17 @@ export class DatabaseStorage implements IStorage {
 
   // Complex operations
   async calculateAndStoreSessionResults(sessionId: string): Promise<SessionResults> {
+    // Check if results are already calculated
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Session not found');
+    
+    if (session.resultsCalculated) {
+      // Results already calculated, just return them from stored data
+      return await this.getStoredSessionResults(sessionId);
+    }
+
     // Use transaction to ensure all session points are stored atomically
     return await db.transaction(async (tx) => {
-      const session = await this.getSession(sessionId);
-      if (!session) throw new Error('Session not found');
-
       const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
       const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
       const noVotes = sessionSubmissions.filter(s => s.vote === 'NO').length;
@@ -577,6 +584,9 @@ export class DatabaseStorage implements IStorage {
         });
       }
 
+      // Mark results as calculated
+      await tx.update(sessions).set({ resultsCalculated: true }).where(eq(sessions.id, sessionId));
+
       const results: SessionResults = {
         sessionId: session.id,
         question: session.question,
@@ -588,6 +598,49 @@ export class DatabaseStorage implements IStorage {
 
       return results;
     });
+  }
+
+  private async getStoredSessionResults(sessionId: string): Promise<SessionResults> {
+    const session = await this.getSession(sessionId);
+    if (!session) throw new Error('Session not found');
+
+    const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
+    const storedPoints = await this.getSessionPointsBySessionId(sessionId);
+    const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
+    const noVotes = sessionSubmissions.filter(s => s.vote === 'NO').length;
+    
+    const participants = [];
+    const leaderboardDelta = [];
+
+    for (const submission of sessionSubmissions) {
+      const participant = await this.getParticipant(submission.participantId);
+      if (!participant) continue;
+
+      const pointsRecord = storedPoints.find(p => p.participantId === submission.participantId);
+      const points = pointsRecord?.points || 0;
+
+      participants.push({
+        participantId: submission.participantId,
+        displayName: participant.displayName,
+        vote: submission.vote,
+        guess: submission.guessYesCount,
+        points
+      });
+
+      leaderboardDelta.push({
+        participantId: submission.participantId,
+        deltaPoints: points
+      });
+    }
+
+    return {
+      sessionId: session.id,
+      question: session.question,
+      yesCount: yesVotes,
+      noCount: noVotes,
+      participants,
+      leaderboardDelta
+    };
   }
 
   private calculatePoints(guess: number | null, actualYesCount: number): number {

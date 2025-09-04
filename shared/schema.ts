@@ -27,6 +27,7 @@ export const sessions = pgTable("sessions", {
   startedAt: timestamp("started_at"),
   endsAt: timestamp("ends_at"),
   endedAt: timestamp("ended_at"),
+  resultsCalculated: boolean("results_calculated").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   gameIdIndex: index("idx_sessions_game_id").on(table.gameId),
