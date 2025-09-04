@@ -53,9 +53,14 @@ export default function Results() {
     }
   }, [location]);
 
-  const { data: session, isLoading } = useQuery<SessionWithResults>({
+  const { data: session, isLoading, refetch } = useQuery<SessionWithResults>({
     queryKey: ["/api/sessions", sessionId],
     enabled: !!sessionId,
+    refetchInterval: (data) => {
+      // Keep refetching every 2 seconds if we don't have results yet
+      return data?.results ? false : 2000;
+    },
+    refetchIntervalInBackground: false,
   });
 
   const { data: game } = useQuery<Game>({
@@ -75,13 +80,36 @@ export default function Results() {
     );
   }
 
-  if (!session?.results) {
+  if (!session) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="p-6">
-            <p className="text-muted-foreground">Results not available</p>
+            <p className="text-muted-foreground">Session not found</p>
             <Button onClick={() => navigate("/")} className="mt-4">
+              Back to Lobby
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!session.results) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <p className="text-muted-foreground mb-4">
+                {session.status === 'live' ? 'Session still in progress...' : 'Calculating results...'}
+              </p>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+              <p className="text-sm text-muted-foreground">
+                Results will appear automatically when ready
+              </p>
+            </div>
+            <Button onClick={() => navigate("/")} className="mt-4" variant="outline">
               Back to Lobby
             </Button>
           </CardContent>
