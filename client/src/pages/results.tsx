@@ -70,13 +70,31 @@ export default function Results() {
   });
 
   const handleBackToLobby = () => {
-    // Invalidate relevant caches to ensure fresh data in lobby
+    // Invalidate ALL relevant caches to ensure fresh data in lobby
     if (session?.gameId) {
+      // Game-specific data (includes leaderboard updates)
       queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
       queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "sessions"] });
       
-      // Also invalidate game-by-code queries that might be cached
+      // Game-by-code queries (for lobby access)
       queryClient.invalidateQueries({ queryKey: ["/api/games/code"] });
+      
+      // Session-specific data (in case user revisits)
+      queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId] });
+      
+      // Admin data if applicable
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      
+      // Invalidate any other game queries that might exist
+      queryClient.invalidateQueries({ 
+        predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && (
+            key.startsWith("/api/games") || 
+            key.startsWith("/api/sessions")
+          );
+        }
+      });
     }
     navigate("/");
   };
