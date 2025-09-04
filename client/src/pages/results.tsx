@@ -70,6 +70,15 @@ export default function Results() {
     refetchOnMount: true, // Always fetch fresh data when component mounts
   });
 
+  // Invalidate game cache when session results become available to ensure fresh leaderboard
+  useEffect(() => {
+    if (session?.results && session?.gameId) {
+      // Invalidate game data to get updated leaderboard with new session
+      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games", session.gameId, "detailed-leaderboard"] });
+    }
+  }, [session?.results, session?.gameId, queryClient]);
+
   const handleBackToLobby = () => {
     // Invalidate ALL relevant caches to ensure fresh data in lobby
     if (session?.gameId) {
