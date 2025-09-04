@@ -342,6 +342,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Historical leaderboard - shows cumulative points up to a specific session
+  app.get('/api/games/:gameId/historical-leaderboard/:sessionId', async (req, res) => {
+    try {
+      const { gameId, sessionId } = req.params;
+      
+      const game = await storage.getGame(gameId);
+      if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+
+      const targetSession = await storage.getSession(sessionId);
+      if (!targetSession || targetSession.gameId !== gameId) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      // Get all sessions for this game up to and including the target session
+      const allSessions = await storage.getSessionsByGameId(gameId);
+      const sessionsUpToTarget = allSessions
+        .filter(s => s.status === 'closed')
+        .sort((a, b) => {
+          const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return dateA - dateB;
+        })
+        .filter(s => {
+          const sessionDate = s.createdAt ? new Date(s.createdAt).getTime() : 0;
+          const targetDate = targetSession.createdAt ? new Date(targetSession.createdAt).getTime() : 0;
+          return sessionDate <= targetDate;
+        });
+
+      // Get all participants for this game
+      const participants = await storage.getParticipantsByGameId(gameId);
+      
+      // Calculate historical leaderboard up to this session
+      const historicalLeaderboard = [];
+      
+      for (const participant of participants) {
+        let totalPoints = 0;
+        let sessionsPlayed = 0;
+        
+        // Sum points from sessions up to the target session
+        for (const session of sessionsUpToTarget) {
+          const sessionPointsRecords = await storage.getSessionPointsBySessionId(session.id);
+          const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
+          
+          if (participantPoints) {
+            totalPoints += participantPoints.points;
+            sessionsPlayed++;
+          }
+        }
+        
+        historicalLeaderboard.push({
+          participantId: participant.id,
+          displayName: participant.displayName,
+          totalPoints,
+          sessionsPlayed
+        });
+      }
+      
+      // Sort by total points descending
+      historicalLeaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
+      
+      res.json({
+        ...game,
+        leaderboard: historicalLeaderboard
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch historical leaderboard' });
+    }
+  });
+
   app.get('/api/admin/games/:gameId/detailed-leaderboard', async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);

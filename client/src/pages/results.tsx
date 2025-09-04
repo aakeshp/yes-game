@@ -67,19 +67,26 @@ export default function Results() {
   });
 
   const { data: game } = useQuery<Game>({
-    queryKey: ["/api/games", session?.gameId],
-    enabled: !!session?.gameId && !!session?.results, // Wait for results to be available
+    queryKey: ["/api/games", session?.gameId, "historical-leaderboard", sessionId],
+    queryFn: () => {
+      if (!session?.gameId || !sessionId) throw new Error('Missing required data');
+      return fetch(`/api/games/${session.gameId}/historical-leaderboard/${sessionId}`)
+        .then(res => res.json());
+    },
+    enabled: !!session?.gameId && !!session?.results && !!sessionId, // Wait for all required data
     refetchOnMount: true, // Always fetch fresh data when component mounts
   });
 
-  // Invalidate game cache when session results become available to ensure fresh leaderboard
+  // Invalidate cache when session results become available to ensure fresh historical leaderboard
   useEffect(() => {
-    if (session?.results && session?.gameId) {
-      // Invalidate game data to get updated leaderboard with new session
+    if (session?.results && session?.gameId && sessionId) {
+      // Invalidate historical leaderboard data for this session
+      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "historical-leaderboard", sessionId] });
+      // Also invalidate current game data for other views
       queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/games", session.gameId, "detailed-leaderboard"] });
     }
-  }, [session?.results, session?.gameId, queryClient]);
+  }, [session?.results, session?.gameId, sessionId, queryClient]);
 
   const handleBackToLobby = () => {
     // Invalidate ALL relevant caches to ensure fresh data in lobby
