@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,6 +44,7 @@ interface SessionWithResults {
 export default function Results() {
   const [location, navigate] = useLocation();
   const [sessionId, setSessionId] = useState<string>("");
+  const queryClient = useQueryClient();
 
   // Extract session ID from URL
   useEffect(() => {
@@ -68,6 +69,18 @@ export default function Results() {
     enabled: !!session?.gameId,
   });
 
+  const handleBackToLobby = () => {
+    // Invalidate relevant caches to ensure fresh data in lobby
+    if (session?.gameId) {
+      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "sessions"] });
+      
+      // Also invalidate game-by-code queries that might be cached
+      queryClient.invalidateQueries({ queryKey: ["/api/games/code"] });
+    }
+    navigate("/");
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -86,7 +99,7 @@ export default function Results() {
         <Card>
           <CardContent className="p-6">
             <p className="text-muted-foreground">Session not found</p>
-            <Button onClick={() => navigate("/")} className="mt-4">
+            <Button onClick={handleBackToLobby} className="mt-4">
               Back to Lobby
             </Button>
           </CardContent>
@@ -109,7 +122,7 @@ export default function Results() {
                 Results will appear automatically when ready
               </p>
             </div>
-            <Button onClick={() => navigate("/")} className="mt-4" variant="outline">
+            <Button onClick={handleBackToLobby} className="mt-4" variant="outline">
               Back to Lobby
             </Button>
           </CardContent>
@@ -134,7 +147,7 @@ export default function Results() {
                 <span>Session Results</span>
               </div>
             </div>
-            <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-back-lobby">
+            <Button variant="ghost" size="sm" onClick={handleBackToLobby} data-testid="button-back-lobby">
               Back to Lobby
             </Button>
           </div>
