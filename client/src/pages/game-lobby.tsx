@@ -30,6 +30,7 @@ export default function GameLobby() {
   const [playerName, setPlayerName] = useState("");
   const [gameCode, setGameCode] = useState("");
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+  const [hasJoinedGame, setHasJoinedGame] = useState(false);
 
   // Load player name from localStorage
   useEffect(() => {
@@ -44,12 +45,13 @@ export default function GameLobby() {
     const match = location.match(/\/play\/(.+)/);
     if (match) {
       setGameCode(match[1]);
+      setHasJoinedGame(true); // Auto-join if coming from URL
     }
   }, [location]);
 
   const { data: game, isLoading: gameLoading } = useQuery<Game>({
     queryKey: ["/api/games/code", gameCode],
-    enabled: !!gameCode,
+    enabled: !!gameCode && hasJoinedGame,
   });
 
   const { data: sessions, isLoading: sessionsLoading } = useQuery<Session[]>({
@@ -78,8 +80,8 @@ export default function GameLobby() {
       localStorage.setItem("playerName", playerName);
       localStorage.setItem(`participantId_${gameCode}`, ""); // Will be set when we join a session
       
-      // Navigate to play URL to trigger game loading
-      navigate(`/play/${gameCode}`);
+      // Join the game (this will trigger data fetching)
+      setHasJoinedGame(true);
     } catch (error) {
       toast({ title: "Error", description: "Failed to join game", variant: "destructive" });
     }
@@ -192,25 +194,31 @@ export default function GameLobby() {
                     value={gameCode}
                     onChange={(e) => setGameCode(e.target.value.toUpperCase())}
                     className="flex-1"
+                    disabled={hasJoinedGame}
                     data-testid="input-game-code"
                   />
-                  <Button onClick={handleJoinGame} disabled={gameLoading} data-testid="button-join">
-                    {gameLoading ? "Joining..." : "Join"}
+                  <Button 
+                    onClick={handleJoinGame} 
+                    disabled={gameLoading || hasJoinedGame || !playerName.trim() || !gameCode.trim()} 
+                    data-testid="button-join"
+                  >
+                    {gameLoading ? "Joining..." : hasJoinedGame ? "Joined" : "Join Game"}
                   </Button>
                 </div>
               </div>
             </div>
             
             {/* Game Info */}
-            {game && (
-              <div className="mt-6 p-4 bg-muted rounded-lg">
-                <h3 className="font-semibold text-foreground mb-1" data-testid="text-game-name">{game.name}</h3>
+            {game && hasJoinedGame && (
+              <div className="mt-6 p-4 bg-primary/10 border border-primary/20 rounded-lg">
+                <h3 className="font-semibold text-foreground mb-1" data-testid="text-game-name">✅ Joined: {game.name}</h3>
                 <p className="text-sm text-muted-foreground">Game Code: {game.code}</p>
+                <p className="text-sm text-primary mt-1">You can now join available sessions below</p>
               </div>
             )}
             
             {/* Sessions List */}
-            {sessions && sessions.length > 0 && (
+            {hasJoinedGame && sessions && sessions.length > 0 && (
               <div className="mt-8 border-t border-border pt-8">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Available Sessions</h3>
                 <div className="space-y-3">
@@ -245,9 +253,15 @@ export default function GameLobby() {
               </div>
             )}
 
-            {sessionsLoading && currentGameId && (
+            {hasJoinedGame && sessionsLoading && currentGameId && (
               <div className="mt-8 text-center">
                 <p className="text-muted-foreground">Loading sessions...</p>
+              </div>
+            )}
+            
+            {hasJoinedGame && sessions && sessions.length === 0 && (
+              <div className="mt-8 p-4 bg-muted rounded-lg text-center">
+                <p className="text-muted-foreground">No sessions available yet. Check back later or contact the game admin.</p>
               </div>
             )}
           </CardContent>
