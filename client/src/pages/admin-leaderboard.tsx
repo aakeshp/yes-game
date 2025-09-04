@@ -130,19 +130,9 @@ export default function AdminLeaderboard() {
                 <h2 className="text-2xl font-bold text-foreground">{gameData.name}</h2>
                 <p className="text-muted-foreground">Game Code: {gameData.code}</p>
               </div>
-              <div className="flex items-center space-x-8">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-primary">{gameData.leaderboard.length}</div>
-                  <div className="text-sm text-muted-foreground">Participants</div>
-                </div>
-                {gameData.leaderboard.length > 0 && (
-                  <div className="text-center">
-                    <div className="text-2xl font-bold text-yellow-500">
-                      {Math.max(...gameData.leaderboard.map(p => p.totalPoints))}
-                    </div>
-                    <div className="text-sm text-muted-foreground">High Score</div>
-                  </div>
-                )}
+              <div className="text-right">
+                <div className="text-2xl font-bold text-primary">{gameData.leaderboard.length}</div>
+                <div className="text-sm text-muted-foreground">Total Participants</div>
               </div>
             </div>
           </CardContent>
