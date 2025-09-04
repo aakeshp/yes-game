@@ -151,10 +151,31 @@ export default function AdminConsole() {
     restartSessionMutation.mutate(sessionId);
   };
 
-  const handlePlayAsParticipant = () => {
-    if (game) {
-      const playUrl = `${window.location.origin}/play/${game.code}`;
-      window.open(playUrl, '_blank');
+  const handlePlayAsParticipant = async () => {
+    if (!game || !selectedSession) {
+      toast({ title: "Error", description: "No session selected to join", variant: "destructive" });
+      return;
+    }
+    
+    const adminName = localStorage.getItem("adminName") || "Admin";
+    
+    try {
+      // Create participant for the admin
+      const participantResponse = await apiRequest("POST", "/api/participants", {
+        gameId: game.id,
+        displayName: adminName,
+      });
+      const participant = await participantResponse.json();
+      
+      // Store participant info
+      localStorage.setItem("playerName", adminName);
+      localStorage.setItem(`participantId_${game.code}`, participant.id);
+      
+      // Open session directly in new tab
+      const sessionUrl = `${window.location.origin}/session/${selectedSession.id}?game=${game.code}`;
+      window.open(sessionUrl, '_blank');
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to join as participant", variant: "destructive" });
     }
   };
 
@@ -301,11 +322,14 @@ export default function AdminConsole() {
                 <div className="space-y-3">
                   <Button 
                     onClick={handlePlayAsParticipant}
+                    disabled={!selectedSession || selectedSession.status !== 'live'}
                     className="w-full bg-primary text-primary-foreground hover:bg-primary/90"
                     data-testid="button-play-participant"
                   >
                     <Play className="w-4 h-4 mr-2" />
-                    Play as Participant
+                    {!selectedSession ? 'No Session Selected' : 
+                     selectedSession.status !== 'live' ? 'Join Live Session' : 
+                     'Join Live Session'}
                   </Button>
                   <Button variant="outline" className="w-full" data-testid="button-switch-view">
                     <ExternalLink className="w-4 h-4 mr-2" />
