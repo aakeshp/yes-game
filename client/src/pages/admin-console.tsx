@@ -240,11 +240,11 @@ export default function AdminConsole() {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => navigate("/admin/setup")}
-                  data-testid="button-settings"
+                  onClick={() => navigate("/")}
+                  data-testid="button-back-home"
                 >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Setup
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Back to Game Lobby
                 </Button>
               </div>
             </div>
