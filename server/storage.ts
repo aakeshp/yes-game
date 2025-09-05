@@ -5,10 +5,6 @@ import { adminUsers, games, sessions, participants, submissions, sessionPoints }
 import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
-  // Admin Users
-  getAdminUser(id: string): Promise<AdminUser | undefined>;
-  createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
-  
   // Games
   getGame(id: string): Promise<Game | undefined>;
   getGameByCode(code: string): Promise<Game | undefined>;
@@ -44,7 +40,6 @@ export interface IStorage {
 }
 
 export class MemStorage implements IStorage {
-  private adminUsers: Map<string, AdminUser> = new Map();
   private games: Map<string, Game> = new Map();
   private sessions: Map<string, Session> = new Map();
   private participants: Map<string, Participant> = new Map();
@@ -61,21 +56,7 @@ export class MemStorage implements IStorage {
     return code;
   }
 
-  async getAdminUser(id: string): Promise<AdminUser | undefined> {
-    return this.adminUsers.get(id);
-  }
-
-  async createAdminUser(insertUser: InsertAdminUser): Promise<AdminUser> {
-    const id = randomUUID();
-    const user: AdminUser = { 
-      ...insertUser, 
-      id, 
-      email: insertUser.email || null,
-      createdAt: new Date() 
-    };
-    this.adminUsers.set(id, user);
-    return user;
-  }
+  // Admin user methods removed - now using Google OAuth
 
   async getGame(id: string): Promise<Game | undefined> {
     return this.games.get(id);
