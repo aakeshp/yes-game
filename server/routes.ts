@@ -291,7 +291,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Google OAuth routes
   app.get('/auth/google', (req, res, next) => {
     console.log('🚀 OAuth Request - Starting Google authentication');
-    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+    const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
+    const host = req.get('host');
+    console.log('🔧 OAuth Request - Protocol:', protocol, 'Host:', host);
+    
+    passport.authenticate('google', { 
+      scope: ['profile', 'email'],
+      callbackURL: `${protocol}://${host}/auth/google/callback`
+    })(req, res, next);
   });
 
   app.get('/auth/google/callback',

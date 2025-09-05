@@ -30,19 +30,11 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
   console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS || 'NOT SET');
   
-  // Construct the callback URL with HTTPS for Replit
-  const host = process.env.REPL_SLUG && process.env.REPL_OWNER 
-    ? `${process.env.REPL_SLUG}--${process.env.REPL_OWNER}.replit.dev`
-    : 'localhost:5000';
-  const protocol = host.includes('replit.dev') ? 'https' : 'http';
-  const callbackURL = `${protocol}://${host}/auth/google/callback`;
-  
-  console.log('🔧 OAuth Setup - Callback URL:', callbackURL);
-
+  // Dynamic callback URL - will be set per request
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: callbackURL
+    callbackURL: "/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
     console.log('🔍 OAuth Callback - Profile received:', {
