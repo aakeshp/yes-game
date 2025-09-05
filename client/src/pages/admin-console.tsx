@@ -42,15 +42,18 @@ export default function AdminConsole() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
 
   // Check if admin is authenticated
-  const adminId = localStorage.getItem("adminId");
-  const adminName = localStorage.getItem("adminName");
+  // Check authentication with Google OAuth
+  const { data: adminUser, isLoading: authLoading } = useQuery<{isAdmin: boolean, name: string, email: string}>({
+    queryKey: ["/api/admin/me"],
+    retry: false,
+  });
 
   useEffect(() => {
-    if (!adminId) {
-      toast({ title: "Access Required", description: "Please complete admin setup first", variant: "destructive" });
-      navigate("/admin/setup");
+    if (!authLoading && !adminUser?.isAdmin) {
+      toast({ title: "Authentication Required", description: "Please sign in to access the admin console", variant: "destructive" });
+      navigate("/admin/login");
     }
-  }, [adminId, navigate, toast]);
+  }, [adminUser, authLoading, navigate, toast]);
 
   // Extract game ID from URL
   useEffect(() => {
@@ -248,7 +251,7 @@ export default function AdminConsole() {
             </div>
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-4">
-                <span className="text-sm text-muted-foreground">Admin: {adminName}</span>
+                <span className="text-sm text-muted-foreground">Admin: {adminUser?.name || adminUser?.email}</span>
                 <Button 
                   variant="ghost" 
                   size="sm" 

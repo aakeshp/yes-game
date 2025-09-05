@@ -11,6 +11,8 @@ import AdminConsole from "@/pages/admin-console";
 import AdminLiveView from "@/pages/admin-live-view";
 import AdminSetup from "@/pages/admin-setup";
 import AdminLeaderboard from "@/pages/admin-leaderboard";
+import AdminLogin from "@/pages/admin-login";
+import AdminLoginFailed from "@/pages/admin-login-failed";
 
 function Router() {
   return (
@@ -19,7 +21,10 @@ function Router() {
       <Route path="/play/:gameCode" component={GameLobby} />
       <Route path="/session/:sessionId" component={LiveSession} />
       <Route path="/results/:sessionId" component={Results} />
+      <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/login-failed" component={AdminLoginFailed} />
       <Route path="/admin/setup" component={AdminSetup} />
+      <Route path="/admin" component={AdminConsole} />
       <Route path="/admin/games/:gameId" component={AdminConsole} />
       <Route path="/admin/games/:gameId/leaderboard" component={AdminLeaderboard} />
       <Route path="/admin/sessions/:sessionId" component={AdminLiveView} />

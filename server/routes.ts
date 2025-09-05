@@ -19,6 +19,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   const connections = new Map<WebSocket, WebSocketConnection>();
   const sessionRooms = new Map<string, Set<WebSocket>>();
+  
+  // Get the admin middleware from app.locals
+  const requireAdmin = app.locals.requireAdmin;
 
   // WebSocket connection handler
   wss.on('connection', (ws) => {
@@ -346,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get('/api/admin/games', async (req, res) => {
+  app.get('/api/admin/games', requireAdmin, async (req, res) => {
     try {
       // In a real app, you'd filter by admin ID
       const games = await storage.getAllGames();
@@ -453,7 +456,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/games/:gameId/detailed-leaderboard', async (req, res) => {
+  app.get('/api/admin/games/:gameId/detailed-leaderboard', requireAdmin, async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);
       if (!game) {
@@ -512,7 +515,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/games/:gameId/export', async (req, res) => {
+  app.get('/api/admin/games/:gameId/export', requireAdmin, async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);
       if (!game) {
