@@ -206,6 +206,25 @@ export default function AdminConsole() {
     createGameMutation.mutate({ name: newGameName.trim() });
   };
 
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/admin/logout", {});
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
+      toast({ title: "Success", description: "Logged out successfully" });
+      navigate("/admin");
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Logout failed", variant: "destructive" });
+    }
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
+
   const handleUpdateSession = () => {
     if (!editQuestion.trim()) {
       toast({ title: "Error", description: "Please enter a question", variant: "destructive" });
@@ -283,6 +302,15 @@ export default function AdminConsole() {
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Back to Game Lobby
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  disabled={logoutMutation.isPending}
+                  data-testid="button-logout"
+                >
+                  {logoutMutation.isPending ? "Logging out..." : "Logout"}
                 </Button>
               </div>
             </div>
@@ -422,6 +450,15 @@ export default function AdminConsole() {
                 >
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Back to Game Lobby
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  disabled={logoutMutation.isPending}
+                  data-testid="button-logout"
+                >
+                  {logoutMutation.isPending ? "Logging out..." : "Logout"}
                 </Button>
               </div>
             </div>
