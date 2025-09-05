@@ -15,6 +15,12 @@ export default function AdminLogin() {
     retry: false,
   });
 
+  // Check if this is an actual authorization failure (not just "not logged in")
+  const isAuthorizationError = error && 
+    (error as any)?.response?.status === 403 || 
+    (error as any)?.message?.includes('Forbidden') ||
+    window.location.search.includes('error=access_denied');
+
   useEffect(() => {
     if (adminUser?.isAdmin) {
       // User is already authenticated, redirect to admin console
@@ -64,7 +70,7 @@ export default function AdminLogin() {
             Sign in with Google
           </Button>
           
-          {error && (
+          {isAuthorizationError && (
             <div className="text-center text-sm text-red-600 bg-red-50 p-3 rounded-lg">
               Access denied. Please contact an administrator if you believe you should have access.
             </div>
