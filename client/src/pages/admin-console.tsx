@@ -40,6 +40,8 @@ export default function AdminConsole() {
   const [editQuestion, setEditQuestion] = useState("");
   const [editTimer, setEditTimer] = useState("30");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [showCreateGame, setShowCreateGame] = useState(false);
+  const [newGameName, setNewGameName] = useState("");
 
   // Check if admin is authenticated
   // Check authentication with Google OAuth
@@ -111,6 +113,24 @@ export default function AdminConsole() {
     }
   });
 
+  const createGameMutation = useMutation({
+    mutationFn: async (data: { name: string }) => {
+      const response = await apiRequest("POST", "/api/games", data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      toast({ title: "Success", description: "Game created successfully" });
+      setShowCreateGame(false);
+      setNewGameName("");
+      // Navigate to the new game's admin console
+      navigate(`/admin/games/${data.gameId}`);
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to create game", variant: "destructive" });
+    }
+  });
+
   const startSessionMutation = useMutation({
     mutationFn: async (sessionId: string) => {
       const response = await apiRequest("POST", `/api/sessions/${sessionId}/start`);
@@ -176,6 +196,14 @@ export default function AdminConsole() {
         toast({ title: "Success", description: "Join link copied to clipboard" });
       });
     }
+  };
+
+  const handleCreateGame = () => {
+    if (!newGameName.trim()) {
+      toast({ title: "Error", description: "Please enter a game name", variant: "destructive" });
+      return;
+    }
+    createGameMutation.mutate({ name: newGameName.trim() });
   };
 
   const handleUpdateSession = () => {
@@ -267,38 +295,90 @@ export default function AdminConsole() {
               <CardTitle>Select a Game to Manage</CardTitle>
             </CardHeader>
             <CardContent>
-              {adminGames && adminGames.length > 0 ? (
-                <div className="space-y-3">
-                  {adminGames.map((adminGame) => (
-                    <div 
-                      key={adminGame.id}
-                      className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
-                      onClick={() => navigate(`/admin/games/${adminGame.id}`)}
-                      data-testid={`game-option-${adminGame.id}`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium">{adminGame.name}</h3>
-                          <p className="text-sm text-muted-foreground">Code: {adminGame.code}</p>
-                        </div>
-                        <Button variant="outline" size="sm">
-                          Manage →
+              <div className="space-y-4">
+                {/* Create New Game Section */}
+                <div className="border-b pb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="font-medium">Create New Game</h3>
+                    {!showCreateGame && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowCreateGame(true)}
+                        data-testid="button-show-create-game"
+                      >
+                        + New Game
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {showCreateGame && (
+                    <div className="space-y-3 bg-muted/30 p-4 rounded-lg">
+                      <div>
+                        <Label htmlFor="game-name">Game Name</Label>
+                        <Input
+                          id="game-name"
+                          placeholder="Enter game name..."
+                          value={newGameName}
+                          onChange={(e) => setNewGameName(e.target.value)}
+                          className="mt-1"
+                          data-testid="input-game-name"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-3">
+                        <Button 
+                          onClick={handleCreateGame}
+                          disabled={createGameMutation.isPending || !newGameName.trim()}
+                          data-testid="button-create-game"
+                        >
+                          {createGameMutation.isPending ? "Creating..." : "Create Game"}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          onClick={() => {
+                            setShowCreateGame(false);
+                            setNewGameName("");
+                          }}
+                          data-testid="button-cancel-create"
+                        >
+                          Cancel
                         </Button>
                       </div>
                     </div>
-                  ))}
+                  )}
                 </div>
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground mb-4">No games found. Create your first game to get started.</p>
-                  <Button 
-                    onClick={() => navigate("/")} 
-                    data-testid="button-create-first-game"
-                  >
-                    Create New Game
-                  </Button>
-                </div>
-              )}
+
+                {/* Existing Games List */}
+                {adminGames && adminGames.length > 0 ? (
+                  <div>
+                    <h3 className="font-medium mb-3">Your Games</h3>
+                    <div className="space-y-3">
+                      {adminGames.map((adminGame) => (
+                        <div 
+                          key={adminGame.id}
+                          className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => navigate(`/admin/games/${adminGame.id}`)}
+                          data-testid={`game-option-${adminGame.id}`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h3 className="font-medium">{adminGame.name}</h3>
+                              <p className="text-sm text-muted-foreground">Code: {adminGame.code}</p>
+                            </div>
+                            <Button variant="outline" size="sm">
+                              Manage →
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-muted-foreground mb-4">No games found. Create your first game to get started.</p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
