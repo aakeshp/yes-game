@@ -30,11 +30,10 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
   console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS || 'NOT SET');
   
-  // Dynamic callback URL - will be set per request
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: "/auth/google/callback"
+    callbackURL: "/auth/google/callback" // Use relative URL since we have multiple domains configured in Google Console
   },
   async (accessToken, refreshToken, profile, done) => {
     console.log('🔍 OAuth Callback - Profile received:', {
