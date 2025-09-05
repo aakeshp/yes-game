@@ -183,10 +183,10 @@ export default function GameLobby() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => navigate("/admin/setup")}
+                onClick={() => navigate("/admin")}
                 data-testid="button-settings"
               >
-                {localStorage.getItem("adminId") ? "Admin Console" : "Admin Setup"}
+                Admin Login
               </Button>
             </div>
           </div>
