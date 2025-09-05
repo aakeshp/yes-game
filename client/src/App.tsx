@@ -24,7 +24,8 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/login-failed" component={AdminLoginFailed} />
       <Route path="/admin/setup" component={AdminSetup} />
-      <Route path="/admin" component={AdminConsole} />
+      <Route path="/admin" component={AdminLogin} />
+      <Route path="/admin/console" component={AdminConsole} />
       <Route path="/admin/games/:gameId" component={AdminConsole} />
       <Route path="/admin/games/:gameId/leaderboard" component={AdminLeaderboard} />
       <Route path="/admin/sessions/:sessionId" component={AdminLiveView} />

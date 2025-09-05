@@ -18,7 +18,7 @@ export default function AdminLogin() {
   useEffect(() => {
     if (adminUser?.isAdmin) {
       // User is already authenticated, redirect to admin console
-      navigate("/admin");
+      navigate("/admin/console");
     }
   }, [adminUser, navigate]);
 

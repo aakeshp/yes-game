@@ -51,7 +51,7 @@ export default function AdminConsole() {
   useEffect(() => {
     if (!authLoading && !adminUser?.isAdmin) {
       toast({ title: "Authentication Required", description: "Please sign in to access the admin console", variant: "destructive" });
-      navigate("/admin/login");
+      navigate("/admin");
     }
   }, [adminUser, authLoading, navigate, toast]);
 

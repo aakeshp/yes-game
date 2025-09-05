@@ -321,7 +321,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     passport.authenticate('google', { failureRedirect: '/admin/login-failed' }),
     (req, res) => {
       // Successful authentication, redirect to admin console
-      res.redirect('/admin');
+      res.redirect('/admin/console');
     }
   );
 
