@@ -26,17 +26,32 @@ app.use(passport.session());
 
 // Google OAuth Strategy
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
+  console.log('🔧 OAuth Setup - Client ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+  console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+  console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS || 'NOT SET');
+  
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     callbackURL: "/auth/google/callback"
   },
   async (accessToken, refreshToken, profile, done) => {
+    console.log('🔍 OAuth Callback - Profile received:', {
+      id: profile.id,
+      displayName: profile.displayName,
+      emails: profile.emails
+    });
+    
     // Check if user email is in admin allowlist
     const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
     const userEmail = profile.emails?.[0]?.value;
     
+    console.log('🔍 OAuth Callback - User email:', userEmail);
+    console.log('🔍 OAuth Callback - Admin emails list:', adminEmails);
+    console.log('🔍 OAuth Callback - Email match found:', adminEmails.includes(userEmail || ''));
+    
     if (userEmail && adminEmails.includes(userEmail)) {
+      console.log('✅ OAuth Success - User authorized');
       return done(null, {
         id: profile.id,
         email: userEmail,
@@ -44,18 +59,21 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         isAdmin: true
       });
     } else {
+      console.log('❌ OAuth Denied - User not in admin list');
       return done(null, false);
     }
   }));
-  
-  passport.serializeUser((user: any, done) => {
-    done(null, user);
-  });
-  
-  passport.deserializeUser((user: any, done) => {
-    done(null, user);
-  });
+} else {
+  console.error('❌ OAuth Setup Failed - Missing credentials');
 }
+
+passport.serializeUser((user: any, done) => {
+  done(null, user);
+});
+
+passport.deserializeUser((user: any, done) => {
+  done(null, user);
+});
 
 // Admin authentication middleware
 function requireAdmin(req: any, res: Response, next: NextFunction) {

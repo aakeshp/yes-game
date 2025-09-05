@@ -289,14 +289,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin Authentication (Google OAuth only)
 
   // Google OAuth routes
-  app.get('/auth/google', 
-    passport.authenticate('google', { scope: ['profile', 'email'] })
-  );
+  app.get('/auth/google', (req, res, next) => {
+    console.log('🚀 OAuth Request - Starting Google authentication');
+    passport.authenticate('google', { scope: ['profile', 'email'] })(req, res, next);
+  });
 
   app.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/admin/login-failed' }),
+    (req, res, next) => {
+      console.log('🔄 OAuth Callback - Received from Google');
+      passport.authenticate('google', { 
+        failureRedirect: '/admin/login-failed',
+        failureMessage: true 
+      })(req, res, next);
+    },
     (req, res) => {
-      // Successful authentication, redirect to admin console
+      console.log('✅ OAuth Callback - Authentication successful, redirecting to console');
       res.redirect('/admin/console');
     }
   );
