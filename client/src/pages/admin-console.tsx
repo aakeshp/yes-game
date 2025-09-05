@@ -68,6 +68,12 @@ export default function AdminConsole() {
     enabled: !!gameId,
   });
 
+  // Get list of all games for admin
+  const { data: adminGames } = useQuery<Game[]>({
+    queryKey: ["/api/admin/games"],
+    enabled: !gameId, // Only load when no specific game is selected
+  });
+
   const { data: sessions } = useQuery<Session[]>({
     queryKey: ["/api/games", gameId, "sessions"],
     enabled: !!gameId,
@@ -225,6 +231,82 @@ export default function AdminConsole() {
   }, [selectedSessionId, draftSessions]);
   const hasLiveSession = sessions?.some((s: Session) => s.status === 'live');
 
+  // Show game selection when no specific game is selected
+  if (!gameId) {
+    return (
+      <div className="min-h-screen bg-background">
+        {/* Navigation Header */}
+        <header className="bg-card border-b border-border shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center h-16">
+              <div className="flex items-center space-x-4">
+                <h1 className="text-2xl font-bold text-primary">Yes Game</h1>
+                <div className="hidden sm:flex space-x-2 text-sm text-muted-foreground">
+                  <span>Admin Console</span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-4">
+                <span className="text-sm text-muted-foreground">Admin: {adminUser?.name || adminUser?.email}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate("/")}
+                  data-testid="button-back-home"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Back to Game Lobby
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Card>
+            <CardHeader>
+              <CardTitle>Select a Game to Manage</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {adminGames && adminGames.length > 0 ? (
+                <div className="space-y-3">
+                  {adminGames.map((adminGame) => (
+                    <div 
+                      key={adminGame.id}
+                      className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => navigate(`/admin/games/${adminGame.id}`)}
+                      data-testid={`game-option-${adminGame.id}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium">{adminGame.name}</h3>
+                          <p className="text-sm text-muted-foreground">Code: {adminGame.code}</p>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          Manage →
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground mb-4">No games found. Create your first game to get started.</p>
+                  <Button 
+                    onClick={() => navigate("/")} 
+                    data-testid="button-create-first-game"
+                  >
+                    Create New Game
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading if game ID exists but game data hasn't loaded yet
   if (!game) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
