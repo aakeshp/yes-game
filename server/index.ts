@@ -30,10 +30,15 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
   console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS || 'NOT SET');
   
-  // Force HTTPS callback URL for external OAuth (Replit uses HTTP internally but HTTPS externally)
-  const host = process.env.REPL_SLUG && process.env.REPL_OWNER 
-    ? `${process.env.REPL_SLUG}--${process.env.REPL_OWNER}.replit.dev`
-    : (process.env.REPLIT_DEV_DOMAIN || 'localhost:5000');
+  // Debug all Replit environment variables to understand actual URLs
+  console.log('🔍 Environment Debug:');
+  console.log('  - REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN || 'NOT SET');
+  console.log('  - REPL_SLUG:', process.env.REPL_SLUG || 'NOT SET');
+  console.log('  - REPL_OWNER:', process.env.REPL_OWNER || 'NOT SET');
+  console.log('  - REPL_ID:', process.env.REPL_ID || 'NOT SET');
+  
+  // Use the actual Replit dev domain (same for both preview and external access)
+  const host = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
   const callbackURL = `https://${host}/auth/google/callback`.replace('http://', 'https://');
   
   console.log('🔧 OAuth Setup - Forced HTTPS Callback URL:', callbackURL);
