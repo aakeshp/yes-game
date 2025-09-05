@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { insertGameSchema, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema } from "@shared/schema";
 import { z } from "zod";
+import passport from "passport";
 
 interface WebSocketConnection {
   ws: WebSocket;
@@ -306,6 +307,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       res.status(500).json({ error: 'Login failed' });
     }
+  });
+
+  // Google OAuth routes
+  app.get('/auth/google', 
+    passport.authenticate('google', { scope: ['profile', 'email'] })
+  );
+
+  app.get('/auth/google/callback',
+    passport.authenticate('google', { failureRedirect: '/admin/login-failed' }),
+    (req, res) => {
+      // Successful authentication, redirect to admin console
+      res.redirect('/admin');
+    }
+  );
+
+  // Check current admin session
+  app.get('/api/admin/me', (req: any, res) => {
+    if (req.user && req.user.isAdmin) {
+      res.json({
+        email: req.user.email,
+        name: req.user.name,
+        isAdmin: true
+      });
+    } else {
+      res.status(401).json({ error: 'Not authenticated' });
+    }
+  });
+
+  // Admin logout
+  app.post('/api/admin/logout', (req: any, res) => {
+    req.logout((err: any) => {
+      if (err) {
+        res.status(500).json({ error: 'Logout failed' });
+      } else {
+        res.json({ success: true });
+      }
+    });
   });
 
   app.get('/api/admin/games', async (req, res) => {
