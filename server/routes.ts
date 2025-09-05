@@ -297,13 +297,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/auth/google/callback',
     (req, res, next) => {
       console.log('🔄 OAuth Callback - Received from Google');
+      console.log('🔄 OAuth Callback - Query params:', req.query);
       passport.authenticate('google', { 
         failureRedirect: '/admin/login-failed',
         failureMessage: true 
-      })(req, res, next);
+      })(req, res, (err: any) => {
+        if (err) {
+          console.error('❌ OAuth Callback - Passport error:', err);
+          return res.redirect('/admin/login-failed');
+        }
+        next();
+      });
     },
     (req, res) => {
       console.log('✅ OAuth Callback - Authentication successful, redirecting to console');
+      console.log('✅ OAuth Callback - User:', req.user);
       res.redirect('/admin/console');
     }
   );
