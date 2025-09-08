@@ -48,12 +48,8 @@ export default function AdminLiveView() {
     enabled: !!sessionId,
   });
 
-  // Join as admin when connected (only once per session)
-  useEffect(() => {
-    if (isConnected && sessionId && !session) {
-      joinAsAdmin(sessionId);
-    }
-  }, [isConnected, sessionId]); // Removed joinAsAdmin dependency to prevent infinite loops
+  // Note: Admins now join through game lobby like regular players
+  // This view is for monitoring only - no direct session joining
 
   // Clean up when leaving the page
   useEffect(() => {
@@ -66,13 +62,7 @@ export default function AdminLiveView() {
   useEffect(() => {
     if (!socket) return;
 
-    const handleAdminJoined = (data: any) => {
-      setSession(data.session);
-      if (data.session.endsAt) {
-        const remaining = Math.max(0, new Date(data.session.endsAt).getTime() - Date.now());
-        setTimeRemaining(Math.floor(remaining / 1000));
-      }
-    };
+    // Removed handleAdminJoined - admins join through lobby now
 
     const handleSessionTick = (data: any) => {
       setTimeRemaining(data.timeRemaining || 0);
@@ -91,14 +81,12 @@ export default function AdminLiveView() {
       toast({ title: "Error", description: data.message || "Something went wrong", variant: "destructive" });
     };
 
-    socket.on('admin:joined', handleAdminJoined);
     socket.on('session:tick', handleSessionTick);
     socket.on('session:participant_update', handleParticipantUpdate);
     socket.on('session:results', handleSessionResults);
     socket.on('error', handleError);
 
     return () => {
-      socket.off('admin:joined', handleAdminJoined);
       socket.off('session:tick', handleSessionTick);
       socket.off('session:participant_update', handleParticipantUpdate);
       socket.off('session:results', handleSessionResults);

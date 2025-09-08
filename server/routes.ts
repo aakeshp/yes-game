@@ -16,16 +16,7 @@ interface WebSocketConnection {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
-  console.log('🔌 Creating WebSocket Server on path: /ws');
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-  
-  wss.on('listening', () => {
-    console.log('✅ WebSocket Server is listening');
-  });
-  
-  wss.on('error', (error) => {
-    console.error('❌ WebSocket Server error:', error);
-  });
   
   const connections = new Map<WebSocket, WebSocketConnection>();
   const sessionRooms = new Map<string, Set<WebSocket>>();
@@ -36,7 +27,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // WebSocket connection handler
   wss.on('connection', (ws, req) => {
     connections.set(ws, { ws });
-    console.log('✅ New WebSocket connection established from:', req.url);
 
     // Send connection confirmation
     ws.send(JSON.stringify({ type: 'connection:ready' }));
