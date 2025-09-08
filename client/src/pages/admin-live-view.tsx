@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { useToast } from "@/hooks/use-toast";
+import { queryClient } from "@/lib/queryClient";
 import { Monitor, Users, Clock, Eye } from "lucide-react";
 
 interface Session {
@@ -153,6 +154,8 @@ export default function AdminLiveView() {
             description: "Session has been ended early. Results will be available shortly.",
             variant: "default"
           });
+          // Refresh session data to show updated status
+          queryClient.invalidateQueries({ queryKey: ["/api/sessions", sessionId] });
           // Stay on admin view instead of redirecting - results will be available soon
         } else {
           throw new Error('Failed to end session');
