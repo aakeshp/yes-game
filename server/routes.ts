@@ -320,18 +320,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     },
     (req: any, res) => {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ OAuth Callback - Authentication successful, saving session and redirecting');
-      }
+      // COMPREHENSIVE DEBUG - Find out why no cookie is set
+      console.log('🔍 OAUTH DEBUG - Session exists:', !!req.session);
+      console.log('🔍 OAUTH DEBUG - User object:', !!req.user);
+      console.log('🔍 OAUTH DEBUG - Session ID:', req.sessionID);
+      console.log('🔍 OAUTH DEBUG - Session data:', Object.keys(req.session || {}));
+      console.log('🔍 OAUTH DEBUG - Cookie settings:', {
+        secure: req.sessionStore?.store?.cookie?.secure,
+        httpOnly: req.sessionStore?.store?.cookie?.httpOnly,
+        sameSite: req.sessionStore?.store?.cookie?.sameSite
+      });
+      
       // Explicitly save session before redirect to ensure cookie is set
       req.session.save((err: any) => {
         if (err) {
-          console.error('❌ Session save error:', err);
+          console.error('❌ OAUTH DEBUG - Session save error:', err);
           return res.redirect('/admin/login-failed');
         }
-        if (process.env.NODE_ENV === 'development') {
-          console.log('✅ Session saved successfully, redirecting to console');
-        }
+        console.log('✅ OAUTH DEBUG - Session saved, ID:', req.sessionID);
+        console.log('✅ OAUTH DEBUG - About to redirect, headers will be sent');
         res.redirect('/admin/console');
       });
     }
