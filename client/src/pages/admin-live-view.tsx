@@ -48,8 +48,8 @@ export default function AdminLiveView() {
     enabled: !!sessionId,
   });
 
-  // Note: Admins now join through game lobby like regular players
-  // This view is for monitoring only - no direct session joining
+  // Admin monitoring view - uses API data and listens for real-time updates
+  // No session joining needed since this is observation-only
 
   // Clean up when leaving the page
   useEffect(() => {
@@ -58,11 +58,9 @@ export default function AdminLiveView() {
     };
   }, []);
 
-  // WebSocket event listeners
+  // WebSocket event listeners for real-time updates (observation only)
   useEffect(() => {
-    if (!socket) return;
-
-    // Removed handleAdminJoined - admins join through lobby now
+    if (!socket || !sessionId) return;
 
     const handleSessionTick = (data: any) => {
       setTimeRemaining(data.timeRemaining || 0);
@@ -81,6 +79,7 @@ export default function AdminLiveView() {
       toast({ title: "Error", description: data.message || "Something went wrong", variant: "destructive" });
     };
 
+    // Listen for session-wide events without joining as admin
     socket.on('session:tick', handleSessionTick);
     socket.on('session:participant_update', handleParticipantUpdate);
     socket.on('session:results', handleSessionResults);
@@ -94,16 +93,16 @@ export default function AdminLiveView() {
     };
   }, [socket, sessionId, navigate, toast]);
 
-  // Use session data from API if not connected to WebSocket
+  // Initialize from API data
   useEffect(() => {
-    if (sessionData && !session) {
+    if (sessionData) {
       setSession(sessionData as Session);
       if (sessionData.endsAt) {
         const remaining = Math.max(0, new Date(sessionData.endsAt).getTime() - Date.now());
         setTimeRemaining(Math.floor(remaining / 1000));
       }
     }
-  }, [sessionData, session]);
+  }, [sessionData]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
