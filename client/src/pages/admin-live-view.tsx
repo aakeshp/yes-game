@@ -71,8 +71,12 @@ export default function AdminLiveView() {
     };
 
     const handleSessionResults = (data: any) => {
-      toast({ title: "Session Complete", description: "Results are now available" });
-      navigate(`/results/${sessionId}`);
+      toast({ 
+        title: "Results Ready!", 
+        description: "Session results have been calculated and are now available",
+        variant: "default"
+      });
+      // Don't auto-navigate - let admin choose when to view results
     };
 
     const handleError = (data: any) => {
@@ -146,11 +150,10 @@ export default function AdminLiveView() {
         if (response.ok) {
           toast({
             title: "Session Ended",
-            description: "Session has been ended early",
+            description: "Session has been ended early. Results will be available shortly.",
             variant: "default"
           });
-          // Navigate back to admin after ending session
-          handleBackToAdmin();
+          // Stay on admin view instead of redirecting - results will be available soon
         } else {
           throw new Error('Failed to end session');
         }
@@ -225,11 +228,12 @@ export default function AdminLiveView() {
               </div>
               <Button 
                 onClick={handleSwitchToPlayerView}
-                className="bg-primary text-primary-foreground hover:bg-primary/90"
+                disabled={session.status !== 'live'}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 data-testid="button-switch-player"
               >
                 <Eye className="w-4 h-4 mr-2" />
-                Switch to Player View
+                {session.status === 'live' ? 'Switch to Player View' : 'Session Ended'}
               </Button>
             </div>
           </CardContent>
