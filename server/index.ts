@@ -90,15 +90,29 @@ try {
     const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
     const userEmail = profile.emails?.[0]?.value;
     
-    // Only log OAuth info in development (no sensitive data)
-    if (process.env.NODE_ENV === 'development') {
+    // Safe production debugging (no sensitive data logged)
+    const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    
+    if (isDevelopment) {
       console.log('🔍 OAuth Callback - Processing user authentication');
       console.log('🔍 OAuth Callback - Email match found:', adminEmails.includes(userEmail || ''));
     }
     
+    // Production debugging (safe, no sensitive info)
+    if (isProduction) {
+      console.log('🔍 Production OAuth Debug - Callback received');
+      console.log('🔍 Production OAuth Debug - Admin emails configured:', adminEmails.length > 0);
+      console.log('🔍 Production OAuth Debug - User email provided:', !!userEmail);
+      console.log('🔍 Production OAuth Debug - Email validation result:', adminEmails.includes(userEmail || ''));
+    }
+    
     if (userEmail && adminEmails.includes(userEmail)) {
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         console.log('✅ OAuth Success - User authorized');
+      }
+      if (isProduction) {
+        console.log('✅ Production OAuth Debug - User authorization successful');
       }
       return done(null, {
         id: profile.id,
@@ -107,8 +121,12 @@ try {
         isAdmin: true
       });
     } else {
-      if (process.env.NODE_ENV === 'development') {
+      if (isDevelopment) {
         console.log('❌ OAuth Denied - User not in admin list');
+      }
+      if (isProduction) {
+        console.log('❌ Production OAuth Debug - User authorization failed');
+        console.log('❌ Production OAuth Debug - Check admin email configuration');
       }
       return done(null, false);
     }
