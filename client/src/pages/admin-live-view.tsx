@@ -49,6 +49,13 @@ export default function AdminLiveView() {
     enabled: !!sessionId,
   });
 
+  // Periodic polling for session stats as WebSocket fallback
+  const { data: sessionStats } = useQuery<{participantCount: number; submissionCount: number; status: string}>({
+    queryKey: ["/api/sessions", sessionId, "stats"],
+    enabled: !!sessionId && session?.status === 'live',
+    refetchInterval: 3000, // Poll every 3 seconds while session is live
+  });
+
   // Admin monitoring view - uses API data and listens for real-time updates
   // No session joining needed since this is observation-only
 
@@ -108,6 +115,19 @@ export default function AdminLiveView() {
       }
     }
   }, [sessionData]);
+
+  // Update stats from API polling (fallback for WebSocket)
+  useEffect(() => {
+    if (sessionStats) {
+      setParticipantCount(sessionStats.participantCount);
+      setSubmissionCount(sessionStats.submissionCount);
+      
+      // Update session status if it changed
+      if (session && sessionStats.status !== session.status) {
+        setSession({ ...session, status: sessionStats.status });
+      }
+    }
+  }, [sessionStats, session]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

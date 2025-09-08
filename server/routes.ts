@@ -655,6 +655,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get session stats for admin monitoring
+  app.get('/api/sessions/:sessionId/stats', async (req, res) => {
+    try {
+      const session = await storage.getSession(req.params.sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+
+      const submissions = await storage.getSubmissionsBySessionId(req.params.sessionId);
+      const sessionRoom = sessionRooms.get(req.params.sessionId);
+      
+      res.json({
+        participantCount: sessionRoom?.size || 0,
+        submissionCount: submissions.length,
+        status: session.status
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get session stats' });
+    }
+  });
+
   app.get('/api/sessions/:sessionId', async (req, res) => {
     try {
       const session = await storage.getSession(req.params.sessionId);
