@@ -381,6 +381,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update game (with name change restrictions)
+  app.patch('/api/games/:gameId', requireAdmin, async (req, res) => {
+    try {
+      const game = await storage.getGame(req.params.gameId);
+      if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+
+      // Check if game can be renamed (no live or closed sessions)
+      const sessions = await storage.getSessionsByGameId(req.params.gameId);
+      const hasActiveOrClosedSessions = sessions.some(
+        session => session.status === 'live' || session.status === 'closed'
+      );
+
+      if (hasActiveOrClosedSessions && req.body.name && req.body.name !== game.name) {
+        res.status(400).json({ 
+          error: 'Cannot rename game after sessions have been started or completed',
+          canRename: false
+        });
+        return;
+      }
+
+      // Parse and validate update data
+      const updateData = insertGameSchema.partial().parse(req.body);
+      const updatedGame = await storage.updateGame(req.params.gameId, updateData);
+      
+      if (!updatedGame) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+      
+      res.json(updatedGame);
+    } catch (error) {
+      res.status(400).json({ error: 'Invalid game data' });
+    }
+  });
+
   // Historical leaderboard - shows cumulative points up to a specific session
   app.get('/api/games/:gameId/historical-leaderboard/:sessionId', async (req, res) => {
     try {

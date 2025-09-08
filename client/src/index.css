@@ -6,7 +6,7 @@
 
 :root {
   --background: hsl(0 0% 100%);
-  --foreground: hsl(210 25% 7.8431%);
+  --foreground: hsl(0, 0%, 13.33%);
   --card: hsl(0, 0%, 100%);
   --card-foreground: hsl(0, 0%, 13.33%);
   --popover: hsl(0 0% 100%);
@@ -15,8 +15,8 @@
   --primary-foreground: hsl(0, 0%, 13.33%);
   --secondary: hsl(0, 0%, 97.65%);
   --secondary-foreground: hsl(0, 0%, 13.33%);
-  --muted: hsl(240 1.9608% 90%);
-  --muted-foreground: hsl(210 25% 7.8431%);
+  --muted: hsl(0, 0%, 97.65%);
+  --muted-foreground: hsl(0, 0%, 13.33%);
   --accent: hsl(120, 66.67%, 95.29%);
   --accent-foreground: hsl(0, 0%, 13.33%);
   --destructive: hsl(345, 69.57%, 90.98%);

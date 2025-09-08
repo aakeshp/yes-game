@@ -10,6 +10,7 @@ export interface IStorage {
   getGameByCode(code: string): Promise<Game | undefined>;
   getAllGames(): Promise<Game[]>;
   createGame(game: InsertGame): Promise<Game>;
+  updateGame(id: string, updates: Partial<InsertGame>): Promise<Game | undefined>;
   getGameWithLeaderboard(id: string): Promise<GameWithLeaderboard | undefined>;
   
   // Sessions
@@ -86,6 +87,15 @@ export class MemStorage implements IStorage {
     this.games.set(id, game);
     this.gameCodeMap.set(code, id);
     return game;
+  }
+
+  async updateGame(id: string, updates: Partial<InsertGame>): Promise<Game | undefined> {
+    const game = this.games.get(id);
+    if (!game) return undefined;
+    
+    const updatedGame = { ...game, ...updates };
+    this.games.set(id, updatedGame);
+    return updatedGame;
   }
 
   async getGameWithLeaderboard(id: string): Promise<GameWithLeaderboard | undefined> {
@@ -357,6 +367,15 @@ export class DatabaseStorage implements IStorage {
       .values({ ...insertGame, code })
       .returning();
     return game;
+  }
+
+  async updateGame(id: string, updates: Partial<InsertGame>): Promise<Game | undefined> {
+    const [updatedGame] = await db
+      .update(games)
+      .set(updates)
+      .where(eq(games.id, id))
+      .returning();
+    return updatedGame || undefined;
   }
 
   async getGameWithLeaderboard(id: string): Promise<GameWithLeaderboard | undefined> {
