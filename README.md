@@ -7,8 +7,6 @@ A real-time multiplayer voting and guessing game platform where participants vot
 ### 🎮 Game Mechanics
 - **Real-time voting**: Participants vote Yes/No on session questions
 - **Guessing challenge**: Players guess the total number of Yes votes
-- **Smart session states**: Draft sessions show "Coming Soon" until live
-- **Consistent navigation**: Always-available "Leave Game" option prevents users getting stuck
 - **Anti-cheat measures**: No interim results shown during live sessions
 - **Point scoring**: Earn points for correct guesses and participation
 - **Cumulative leaderboards**: Track performance across multiple sessions
@@ -26,7 +24,6 @@ A real-time multiplayer voting and guessing game platform where participants vot
 - **Real-time updates**: WebSocket integration for live session updates
 - **Production-ready sessions**: PostgreSQL-backed session storage for scalability
 - **Secure authentication**: Dual-environment Google OAuth with production isolation
-- **Anti-cheat measures**: No interim results to maintain session integrity
 - **Responsive design**: Works seamlessly on desktop and mobile
 - **Type safety**: Full TypeScript implementation across frontend and backend
 
@@ -85,29 +82,19 @@ A real-time multiplayer voting and guessing game platform where participants vot
 
 ## 🔐 Google OAuth Setup
 
-This application uses **separate Google OAuth credentials** for development and production environments for enhanced security.
+This application uses **separate Google OAuth credentials** for development and production environments.
 
-### Creating OAuth Applications
+**Why Separate Apps?**
+- 🔒 **Security isolation** between environments
+- 🌐 **Different callback URLs** (dev vs production domains)  
+- 🚀 **Prevents credential mix-ups** during deployment
 
-**Step 1: Development OAuth App**
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing one
-3. Enable Google+ API (or Google People API)
-4. Go to "Credentials" → "Create Credentials" → "OAuth client ID"
-5. Choose "Web application" type
-6. Add authorized redirect URI: `https://your-repl-name.replit.dev/auth/google/callback`
-7. Save your Client ID and Client Secret
+**Setup Required:**
+- Create OAuth app for development with callback: `https://your-dev-domain/auth/google/callback`
+- Create separate OAuth app for production with callback: `https://your-prod-domain/auth/google/callback`
+- Configure environment variables with respective Client IDs and Secrets
 
-**Step 2: Production OAuth App** 
-1. Create a **separate** OAuth client ID for production
-2. Add authorized redirect URI: `https://your-custom-domain.com/auth/google/callback`
-3. Save your production Client ID and Client Secret
-
-### Why Separate OAuth Apps?
-
-- **🔒 Security**: Dev credentials can't access production
-- **🌐 Domain isolation**: Different callback URLs for each environment  
-- **🚀 Deployment safety**: Automatic environment detection prevents mix-ups
+Refer to [Google Cloud Console](https://console.cloud.google.com/) to create OAuth applications.
 
 ## 🎯 How to Play
 
@@ -191,9 +178,16 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-## 🚀 Production Deployment
+## 🚀 Deployment Options
 
-### Replit Deployment
+### General Deployment
+This app can be deployed on any Node.js hosting platform:
+- Set production environment variables (see environment setup above)
+- Configure PostgreSQL database
+- Set up custom domain with HTTPS
+- Ensure WebSocket support for real-time features
+
+### Replit Deployment (Recommended)
 1. **Set up production Google OAuth app** (see OAuth Setup section above)
 
 2. **Configure Replit Secrets** with production environment variables:
