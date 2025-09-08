@@ -44,6 +44,12 @@ export default function LiveSession() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [hasChangedSinceSubmit, setHasChangedSinceSubmit] = useState(false);
 
+  // Check if current user is an admin
+  const { data: adminUser } = useQuery<{isAdmin: boolean, name: string, email: string}>({
+    queryKey: ["/api/admin/me"],
+    retry: false,
+  });
+
   // Extract session ID from URL
   useEffect(() => {
     const match = location.match(/\/session\/(.+)/);
@@ -217,9 +223,22 @@ export default function LiveSession() {
                   </span>
                 </div>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-leave">
-                Leave Session
-              </Button>
+              <div className="flex items-center space-x-2">
+                {adminUser?.isAdmin && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => navigate(`/admin/sessions/${sessionId}`)}
+                    data-testid="button-switch-admin"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Switch to Admin View
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-leave">
+                  Leave Session
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>
