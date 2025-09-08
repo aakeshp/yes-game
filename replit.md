@@ -1,6 +1,12 @@
 # Overview
 
-This is a multiplayer voting web application built as a real-time game platform. The system allows admins to create games containing multiple sessions, where participants vote Yes/No on questions and guess the total number of Yes votes. The application emphasizes anti-cheat measures by preventing interim tallies during live sessions and only revealing results after the timer expires.
+This is a production-ready multiplayer voting web application built as a real-time game platform. The system allows admins to create games containing multiple sessions, where participants vote Yes/No on questions and guess the total number of Yes votes. The application emphasizes anti-cheat measures by preventing interim tallies during live sessions and only revealing results after the timer expires.
+
+## Recent Updates (September 2025)
+- **Production Security**: Trust proxy configuration and PostgreSQL session storage
+- **OAuth Enhancement**: Separate dev/prod Google OAuth credentials for security isolation
+- **UX Improvements**: Draft session states, copy code functionality, consistent navigation
+- **Anti-Cheat Hardening**: Secure session management and real-time integrity
 
 # User Preferences
 
@@ -36,9 +42,11 @@ The application follows a monorepo structure with separate client and server dir
 - Admin live view capabilities for monitoring active sessions
 
 **Authentication & Authorization:**
-- Simple session-based authentication for admin users
-- Participant identification using localStorage-stored participant IDs
-- Game-scoped participant management
+- **Production-grade session management**: PostgreSQL-backed sessions with connect-pg-simple
+- **Dual-environment OAuth**: Separate Google OAuth credentials for dev/prod security isolation
+- **Trust proxy configuration**: Secure cookie handling behind Replit's proxy infrastructure
+- **Participant identification**: localStorage-stored participant IDs with game-scoped management
+- **Session security**: Unique session names and proper cookie isolation from platform
 
 ## Key Design Patterns
 
