@@ -24,43 +24,66 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Google OAuth Strategy
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  // Only log OAuth setup in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 OAuth Setup - Client ID exists:', !!process.env.GOOGLE_CLIENT_ID);
-    console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
-    console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
-  }
-  
-  // Determine callback URL at server startup
-  const getCallbackURL = () => {
-    if (process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1') {
-      // Production: Use deployment URL from environment
-      const deploymentUrl = process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN;
-      if (!deploymentUrl) {
-        console.error('❌ OAuth Setup - Missing deployment URL in production');
-        return 'https://localhost:5000/auth/google/callback'; // Fallback
-      }
-      return `https://${deploymentUrl.replace(/^https?:\/\//, '')}/auth/google/callback`;
-    } else {
-      // Development: Use dev domain
-      const devDomain = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-      return `https://${devDomain}/auth/google/callback`;
+// Google OAuth Strategy with environment-specific configuration
+const getOAuthConfig = () => {
+  if (process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1') {
+    // Production: Use configurable domain and separate credentials
+    const productionDomain = process.env.PRODUCTION_DOMAIN;
+    const clientID = process.env.GOOGLE_CLIENT_ID_PROD || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET_PROD || process.env.GOOGLE_CLIENT_SECRET;
+    
+    if (!productionDomain) {
+      console.error('❌ OAuth Setup - PRODUCTION_DOMAIN environment variable required for production');
+      throw new Error('PRODUCTION_DOMAIN environment variable required for production');
     }
-  };
+    if (!clientID || !clientSecret) {
+      console.error('❌ OAuth Setup - Missing Google OAuth credentials for production');
+      throw new Error('Missing Google OAuth credentials for production');
+    }
+    
+    return {
+      clientID: clientID,
+      clientSecret: clientSecret,
+      callbackURL: `https://${productionDomain}/auth/google/callback`
+    };
+  } else {
+    // Development: Use Replit's dev domain and dev credentials
+    const devDomain = process.env.REPLIT_DEV_DOMAIN;
+    const clientID = process.env.GOOGLE_CLIENT_ID_DEV || process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET_DEV || process.env.GOOGLE_CLIENT_SECRET;
+    
+    if (!devDomain) {
+      console.error('❌ OAuth Setup - REPLIT_DEV_DOMAIN not available in development');
+      throw new Error('REPLIT_DEV_DOMAIN not available in development');
+    }
+    if (!clientID || !clientSecret) {
+      console.error('❌ OAuth Setup - Missing Google OAuth credentials for development');
+      throw new Error('Missing Google OAuth credentials for development');
+    }
+    
+    return {
+      clientID: clientID,
+      clientSecret: clientSecret,
+      callbackURL: `https://${devDomain}/auth/google/callback`
+    };
+  }
+};
 
-  const callbackURL = getCallbackURL();
+try {
+  const oauthConfig = getOAuthConfig();
   
   // Only log OAuth setup in development
   if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 OAuth Setup - Callback URL:', callbackURL);
+    console.log('🔧 OAuth Setup - Environment:', process.env.NODE_ENV);
+    console.log('🔧 OAuth Setup - Using dev credentials:', !!process.env.GOOGLE_CLIENT_ID_DEV);
+    console.log('🔧 OAuth Setup - Callback URL:', oauthConfig.callbackURL);
+    console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
   }
 
   passport.use(new GoogleStrategy({
-    clientID: process.env.GOOGLE_CLIENT_ID,
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: callbackURL
+    clientID: oauthConfig.clientID,
+    clientSecret: oauthConfig.clientSecret,
+    callbackURL: oauthConfig.callbackURL
   },
   async (accessToken: any, refreshToken: any, profile: any, done: any) => {
     // Check if user email is in admin allowlist
@@ -90,8 +113,13 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
       return done(null, false);
     }
   }));
-} else {
-  console.error('❌ OAuth Setup Failed - Missing credentials');
+  
+  if (process.env.NODE_ENV === 'development') {
+    console.log('✅ OAuth Setup Complete');
+  }
+} catch (error) {
+  console.error('❌ OAuth Setup Failed:', error instanceof Error ? error.message : error);
+  console.error('💡 Check your environment variables and ensure proper OAuth configuration');
 }
 
 passport.serializeUser((user: any, done) => {
