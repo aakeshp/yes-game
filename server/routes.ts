@@ -76,6 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       case 'admin:join':
         await handleAdminJoin(ws, data.payload);
         break;
+      case 'admin:monitor':
+        await handleAdminMonitor(ws, data.payload);
+        break;
     }
   }
 
@@ -222,6 +225,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.send(JSON.stringify({
       type: 'admin:joined',
       payload: { session }
+    }));
+  }
+
+  async function handleAdminMonitor(ws: WebSocket, payload: any) {
+    const { sessionId } = payload;
+    const connection = connections.get(ws);
+    if (!connection) return;
+
+    connection.sessionId = sessionId;
+    connection.isAdmin = true;
+
+    // Add to session room for monitoring (no participant creation)
+    if (!sessionRooms.has(sessionId)) {
+      sessionRooms.set(sessionId, new Set());
+    }
+    sessionRooms.get(sessionId)!.add(ws);
+
+    // Confirm monitoring started
+    ws.send(JSON.stringify({
+      type: 'admin:monitoring',
+      payload: { sessionId }
     }));
   }
 
