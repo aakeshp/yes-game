@@ -140,11 +140,11 @@ export default function AdminLiveView() {
     } else if (sessionData?.gameId) {
       navigate(`/admin/games/${sessionData.gameId}`);
     } else {
-      // Fallback to admin setup if we can't determine the game ID
-      navigate('/admin/setup');
+      // Fallback to admin console if we can't determine the game ID
+      navigate('/admin/console');
       toast({
         title: "Navigation Issue",
-        description: "Returned to admin setup due to lost game context",
+        description: "Returned to admin console due to lost game context",
         variant: "default"
       });
     }
