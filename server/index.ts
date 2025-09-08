@@ -1,5 +1,6 @@
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { registerRoutes } from "./routes";
@@ -14,7 +15,15 @@ app.use(express.urlencoded({ extended: false }));
 // Use same production detection as OAuth config
 const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
 
+// PostgreSQL session store for production reliability
+const PgSession = connectPgSimple(session);
+
 app.use(session({
+  store: new PgSession({
+    conString: process.env.DATABASE_URL,
+    tableName: 'user_sessions',
+    createTableIfMissing: true
+  }),
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
   name: 'oak-voting-game-session', // Unique session name to avoid conflicts
   resave: false,
@@ -81,13 +90,8 @@ const getOAuthConfig = () => {
 try {
   const oauthConfig = getOAuthConfig();
   
-  // Only log OAuth setup in development
-  if (process.env.NODE_ENV === 'development') {
-    console.log('🔧 OAuth Setup - Environment:', process.env.NODE_ENV);
-    console.log('🔧 OAuth Setup - Using main credentials for dev:', !!process.env.GOOGLE_CLIENT_ID);
-    console.log('🔧 OAuth Setup - Callback URL:', oauthConfig.callbackURL);
-    console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
-  }
+  // Basic OAuth setup confirmation (production safe)
+  console.log('OAuth setup complete');
 
   passport.use(new GoogleStrategy({
     clientID: oauthConfig.clientID,
@@ -99,30 +103,7 @@ try {
     const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
     const userEmail = profile.emails?.[0]?.value;
     
-    // Safe production debugging (no sensitive data logged)
-    const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    if (isDevelopment) {
-      console.log('🔍 OAuth Callback - Processing user authentication');
-      console.log('🔍 OAuth Callback - Email match found:', adminEmails.includes(userEmail || ''));
-    }
-    
-    // Production debugging (safe, no sensitive info)
-    if (isProduction) {
-      console.log('🔍 Production OAuth Debug - Callback received');
-      console.log('🔍 Production OAuth Debug - Admin emails configured:', adminEmails.length > 0);
-      console.log('🔍 Production OAuth Debug - User email provided:', !!userEmail);
-      console.log('🔍 Production OAuth Debug - Email validation result:', adminEmails.includes(userEmail || ''));
-    }
-    
     if (userEmail && adminEmails.includes(userEmail)) {
-      if (isDevelopment) {
-        console.log('✅ OAuth Success - User authorized');
-      }
-      if (isProduction) {
-        console.log('✅ Production OAuth Debug - User authorization successful');
-      }
       return done(null, {
         id: profile.id,
         email: userEmail,
@@ -130,20 +111,10 @@ try {
         isAdmin: true
       });
     } else {
-      if (isDevelopment) {
-        console.log('❌ OAuth Denied - User not in admin list');
-      }
-      if (isProduction) {
-        console.log('❌ Production OAuth Debug - User authorization failed');
-        console.log('❌ Production OAuth Debug - Check admin email configuration');
-      }
       return done(null, false);
     }
   }));
   
-  if (process.env.NODE_ENV === 'development') {
-    console.log('✅ OAuth Setup Complete');
-  }
 } catch (error) {
   console.error('❌ OAuth Setup Failed:', error instanceof Error ? error.message : error);
   console.error('💡 Check your environment variables and ensure proper OAuth configuration');

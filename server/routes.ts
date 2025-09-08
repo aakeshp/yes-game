@@ -320,25 +320,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     },
     (req: any, res) => {
-      // COMPREHENSIVE DEBUG - Find out why no cookie is set
-      console.log('🔍 OAUTH DEBUG - Session exists:', !!req.session);
-      console.log('🔍 OAUTH DEBUG - User object:', !!req.user);
-      console.log('🔍 OAUTH DEBUG - Session ID:', req.sessionID);
-      console.log('🔍 OAUTH DEBUG - Session data:', Object.keys(req.session || {}));
-      console.log('🔍 OAUTH DEBUG - Cookie settings:', {
-        secure: req.sessionStore?.store?.cookie?.secure,
-        httpOnly: req.sessionStore?.store?.cookie?.httpOnly,
-        sameSite: req.sessionStore?.store?.cookie?.sameSite
-      });
-      
       // Explicitly save session before redirect to ensure cookie is set
       req.session.save((err: any) => {
         if (err) {
-          console.error('❌ OAUTH DEBUG - Session save error:', err);
+          console.error('Session save error during OAuth:', err);
           return res.redirect('/admin/login-failed');
         }
-        console.log('✅ OAUTH DEBUG - Session saved, ID:', req.sessionID);
-        console.log('✅ OAUTH DEBUG - About to redirect, headers will be sent');
         res.redirect('/admin/console');
       });
     }
@@ -363,7 +350,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (err) {
         return res.status(500).json({ error: 'Logout failed' });
       }
-      res.json({ success: true });
+      // Destroy session in PostgreSQL and clear client cookie
+      req.session.destroy((sessionErr: any) => {
+        if (sessionErr) {
+          console.error('Session destruction error:', sessionErr);
+          return res.status(500).json({ error: 'Session destruction failed' });
+        }
+        // Clear the session cookie on client
+        res.clearCookie('oak-voting-game-session');
+        res.json({ success: true });
+      });
     });
   });
 
