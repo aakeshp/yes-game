@@ -352,6 +352,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const games = await storage.getAllGames();
       res.json(games);
     } catch (error) {
+      console.error('Error fetching admin games:', error);
       res.status(500).json({ error: 'Failed to fetch games' });
     }
   });
