@@ -71,7 +71,7 @@ export default function AdminLogin() {
           </Button>
           
           {isAuthorizationError && (
-            <div className="text-center text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+            <div className="text-center text-sm text-destructive bg-destructive/10 p-3 rounded-lg">
               Access denied. Please contact an administrator if you believe you should have access.
             </div>
           )}

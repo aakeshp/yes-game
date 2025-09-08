@@ -86,11 +86,11 @@ export default function AdminLeaderboard() {
   const getRankIcon = (position: number) => {
     switch (position) {
       case 1:
-        return <Trophy className="w-6 h-6 text-yellow-500" />;
+        return <Trophy className="w-6 h-6 text-primary" />;
       case 2:
-        return <Medal className="w-6 h-6 text-gray-400" />;
+        return <Medal className="w-6 h-6 text-muted-foreground" />;
       case 3:
-        return <Award className="w-6 h-6 text-orange-600" />;
+        return <Award className="w-6 h-6 text-accent" />;
       default:
         return <span className="w-6 h-6 flex items-center justify-center text-muted-foreground font-bold">#{position}</span>;
     }
@@ -142,7 +142,7 @@ export default function AdminLeaderboard() {
         <Card className="shadow-lg border border-border">
           <CardHeader>
             <CardTitle className="flex items-center">
-              <Trophy className="w-6 h-6 mr-2 text-yellow-500" />
+              <Trophy className="w-6 h-6 mr-2 text-primary" />
               Detailed Leaderboard
             </CardTitle>
           </CardHeader>
@@ -227,7 +227,7 @@ export default function AdminLeaderboard() {
                                 </div>
                                 <div className="text-right ml-4">
                                   <div className={`text-lg font-semibold ${
-                                    session.points > 0 ? 'text-green-600' : 'text-muted-foreground'
+                                    session.points > 0 ? 'text-secondary' : 'text-muted-foreground'
                                   }`}>
                                     {session.points} pts
                                   </div>

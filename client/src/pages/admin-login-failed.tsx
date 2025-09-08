@@ -6,7 +6,7 @@ export default function AdminLoginFailed() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl text-red-600">Access Denied</CardTitle>
+          <CardTitle className="text-2xl text-destructive">Access Denied</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 text-center">
           <p className="text-muted-foreground">
