@@ -33,14 +33,11 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
   }
   
-  // Use the actual Replit dev domain (same for both preview and external access)
-  const host = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-  const callbackURL = `https://${host}/auth/google/callback`.replace('http://', 'https://');
-
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: callbackURL
+    // Remove callbackURL - let Passport auto-detect from request headers
+    // This allows it to work with any domain (dev, production, custom domains)
   },
   async (accessToken, refreshToken, profile, done) => {
     // Check if user email is in admin allowlist
