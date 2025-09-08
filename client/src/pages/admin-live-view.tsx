@@ -71,7 +71,10 @@ export default function AdminLiveView() {
     if (!socket || !sessionId) return;
 
     const handleSessionTick = (data: any) => {
-      setTimeRemaining(data.timeRemaining || 0);
+      // Only update timer for live sessions to avoid conflicts
+      if (session?.status === 'live') {
+        setTimeRemaining(data.timeRemaining || 0);
+      }
     };
 
     const handleParticipantUpdate = (data: any) => {
@@ -109,9 +112,13 @@ export default function AdminLiveView() {
   useEffect(() => {
     if (sessionData) {
       setSession(sessionData as Session);
-      if (sessionData.endsAt) {
+      if (sessionData.endsAt && sessionData.status === 'live') {
+        // Only calculate remaining time for live sessions
         const remaining = Math.max(0, new Date(sessionData.endsAt).getTime() - Date.now());
         setTimeRemaining(Math.floor(remaining / 1000));
+      } else if (sessionData.status !== 'live') {
+        // Clear timer for non-live sessions
+        setTimeRemaining(0);
       }
     }
   }, [sessionData]);
@@ -125,6 +132,11 @@ export default function AdminLiveView() {
       // Update session status if it changed
       if (session && sessionStats.status !== session.status) {
         setSession({ ...session, status: sessionStats.status });
+        
+        // Clear timer when session ends
+        if (sessionStats.status !== 'live') {
+          setTimeRemaining(0);
+        }
       }
     }
   }, [sessionStats, session]);
