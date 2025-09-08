@@ -26,22 +26,16 @@ app.use(passport.session());
 
 // Google OAuth Strategy
 if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  console.log('🔧 OAuth Setup - Client ID exists:', !!process.env.GOOGLE_CLIENT_ID);
-  console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
-  console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS || 'NOT SET');
-  
-  // Debug all Replit environment variables to understand actual URLs
-  console.log('🔍 Environment Debug:');
-  console.log('  - REPLIT_DEV_DOMAIN:', process.env.REPLIT_DEV_DOMAIN || 'NOT SET');
-  console.log('  - REPL_SLUG:', process.env.REPL_SLUG || 'NOT SET');
-  console.log('  - REPL_OWNER:', process.env.REPL_OWNER || 'NOT SET');
-  console.log('  - REPL_ID:', process.env.REPL_ID || 'NOT SET');
+  // Only log OAuth setup in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔧 OAuth Setup - Client ID exists:', !!process.env.GOOGLE_CLIENT_ID);
+    console.log('🔧 OAuth Setup - Client Secret exists:', !!process.env.GOOGLE_CLIENT_SECRET);
+    console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
+  }
   
   // Use the actual Replit dev domain (same for both preview and external access)
   const host = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
   const callbackURL = `https://${host}/auth/google/callback`.replace('http://', 'https://');
-  
-  console.log('🔧 OAuth Setup - Forced HTTPS Callback URL:', callbackURL);
 
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
@@ -49,22 +43,20 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     callbackURL: callbackURL
   },
   async (accessToken, refreshToken, profile, done) => {
-    console.log('🔍 OAuth Callback - Profile received:', {
-      id: profile.id,
-      displayName: profile.displayName,
-      emails: profile.emails
-    });
-    
     // Check if user email is in admin allowlist
     const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
     const userEmail = profile.emails?.[0]?.value;
     
-    console.log('🔍 OAuth Callback - User email:', userEmail);
-    console.log('🔍 OAuth Callback - Admin emails list:', adminEmails);
-    console.log('🔍 OAuth Callback - Email match found:', adminEmails.includes(userEmail || ''));
+    // Only log OAuth info in development (no sensitive data)
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔍 OAuth Callback - Processing user authentication');
+      console.log('🔍 OAuth Callback - Email match found:', adminEmails.includes(userEmail || ''));
+    }
     
     if (userEmail && adminEmails.includes(userEmail)) {
-      console.log('✅ OAuth Success - User authorized');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ OAuth Success - User authorized');
+      }
       return done(null, {
         id: profile.id,
         email: userEmail,
@@ -72,7 +64,9 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
         isAdmin: true
       });
     } else {
-      console.log('❌ OAuth Denied - User not in admin list');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('❌ OAuth Denied - User not in admin list');
+      }
       return done(null, false);
     }
   }));
@@ -115,8 +109,13 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     if (path.startsWith("/api")) {
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
-      if (capturedJsonResponse) {
-        logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+      
+      // Only log response body in development, and sanitize sensitive endpoints
+      if (process.env.NODE_ENV === 'development' && capturedJsonResponse) {
+        // Don't log response bodies for auth endpoints or user data
+        if (!path.includes('/auth') && !path.includes('/admin/me')) {
+          logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
+        }
       }
 
       if (logLine.length > 80) {

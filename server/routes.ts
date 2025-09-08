@@ -290,11 +290,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Google OAuth routes
   app.get('/auth/google', (req, res, next) => {
-    console.log('🚀 OAuth Request - Starting Google authentication');
-    const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
-    const host = req.get('host');
-    const callbackURL = `${protocol}://${host}/auth/google/callback`;
-    console.log('🔧 OAuth Request - Protocol:', protocol, 'Host:', host, 'Callback:', callbackURL);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🚀 OAuth Request - Starting Google authentication');
+    }
     
     passport.authenticate('google', { 
       scope: ['profile', 'email']
@@ -303,22 +301,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/auth/google/callback',
     (req, res, next) => {
-      console.log('🔄 OAuth Callback - Received from Google');
-      console.log('🔄 OAuth Callback - Query params:', req.query);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 OAuth Callback - Received from Google');
+        // Don't log query params as they contain sensitive tokens
+        console.log('🔄 OAuth Callback - Processing authentication...');
+      }
       passport.authenticate('google', { 
         failureRedirect: '/admin/login-failed',
         failureMessage: true 
       })(req, res, (err: any) => {
         if (err) {
-          console.error('❌ OAuth Callback - Passport error:', err);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('❌ OAuth Callback - Passport error:', err);
+          }
           return res.redirect('/admin/login-failed');
         }
         next();
       });
     },
     (req, res) => {
-      console.log('✅ OAuth Callback - Authentication successful, redirecting to console');
-      console.log('✅ OAuth Callback - User:', req.user);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ OAuth Callback - Authentication successful, redirecting to console');
+      }
       res.redirect('/admin/console');
     }
   );
