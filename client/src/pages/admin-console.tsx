@@ -216,7 +216,7 @@ export default function AdminConsole() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
       toast({ title: "Success", description: "Logged out successfully" });
-      navigate("/admin");
+      navigate("/");
     },
     onError: () => {
       toast({ title: "Error", description: "Logout failed", variant: "destructive" });
