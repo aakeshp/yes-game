@@ -319,11 +319,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         next();
       });
     },
-    (req, res) => {
+    (req: any, res) => {
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ OAuth Callback - Authentication successful, redirecting to console');
+        console.log('✅ OAuth Callback - Authentication successful, saving session and redirecting');
       }
-      res.redirect('/admin/console');
+      // Explicitly save session before redirect to ensure cookie is set
+      req.session.save((err: any) => {
+        if (err) {
+          console.error('❌ Session save error:', err);
+          return res.redirect('/admin/login-failed');
+        }
+        if (process.env.NODE_ENV === 'development') {
+          console.log('✅ Session saved successfully, redirecting to console');
+        }
+        res.redirect('/admin/console');
+      });
     }
   );
 
