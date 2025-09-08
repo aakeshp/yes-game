@@ -27,7 +27,7 @@ interface SessionData {
 export default function AdminLiveView() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { isConnected, socket, joinAsAdmin } = useWebSocket();
+  const { isConnected, socket } = useWebSocket();
   
   const [sessionId, setSessionId] = useState<string>("");
   const [session, setSession] = useState<Session | null>(null);
