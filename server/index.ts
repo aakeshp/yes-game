@@ -10,15 +10,18 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Session configuration - isolated from Replit platform
+// Use same production detection as OAuth config
+const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
   name: 'oak-voting-game-session', // Unique session name to avoid conflicts
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction,
     httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     // NO domain setting - defaults to exact hostname only
     // This prevents interference with Replit platform cookies
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
