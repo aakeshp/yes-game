@@ -138,9 +138,9 @@ export default function AdminConsole() {
     },
     onSuccess: (data, sessionId) => {
       queryClient.invalidateQueries({ queryKey: ["/api/games", gameId, "sessions"] });
-      toast({ title: "Success", description: "Session started successfully" });
-      // Navigate to live view
-      navigate(`/admin/sessions/${sessionId}`);
+      toast({ title: "Success", description: "Session started - redirecting to game lobby" });
+      // Navigate to game lobby so admin can enter display name like other players
+      navigate(`/play/${game?.code}`);
     },
     onError: () => {
       toast({ title: "Error", description: "Failed to start session", variant: "destructive" });
