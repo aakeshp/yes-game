@@ -191,11 +191,10 @@ export default function AdminConsole() {
     }
   };
 
-  const handleCopyJoinLink = () => {
+  const handleCopyJoinCode = () => {
     if (game) {
-      const joinUrl = `${window.location.origin}/play/${game.code}`;
-      navigator.clipboard.writeText(joinUrl).then(() => {
-        toast({ title: "Success", description: "Join link copied to clipboard" });
+      navigator.clipboard.writeText(game.code).then(() => {
+        toast({ title: "Success", description: "Game code copied to clipboard" });
       });
     }
   };
@@ -596,12 +595,12 @@ export default function AdminConsole() {
                       <Input value={game.code} readOnly className="flex-1" data-testid="text-game-code" />
                       <Button 
                         size="sm" 
-                        onClick={handleCopyJoinLink}
+                        onClick={handleCopyJoinCode}
                         className="bg-secondary text-secondary-foreground hover:bg-secondary/90"
-                        data-testid="button-copy-link"
+                        data-testid="button-copy-code"
                       >
                         <Copy className="w-4 h-4 mr-1" />
-                        Copy Link
+                        Copy Code
                       </Button>
                     </div>
                   </div>

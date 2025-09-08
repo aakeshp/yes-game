@@ -297,9 +297,10 @@ export default function GameLobby() {
                           variant={session.status === 'live' ? 'destructive' : session.status === 'closed' ? 'outline' : 'secondary'}
                           size="sm"
                           onClick={() => handleJoinSession(session)}
+                          disabled={session.status === 'draft'}
                           data-testid={`button-join-session-${session.id}`}
                         >
-                          {session.status === 'live' ? 'Join Live' : session.status === 'closed' ? 'View Results' : 'Join Session'}
+                          {session.status === 'live' ? 'Join Live' : session.status === 'closed' ? 'View Results' : session.status === 'draft' ? 'Coming Soon' : 'Join Session'}
                         </Button>
                       </div>
                     </div>
