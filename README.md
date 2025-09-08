@@ -7,22 +7,27 @@ A real-time multiplayer voting and guessing game platform where participants vot
 ### 🎮 Game Mechanics
 - **Real-time voting**: Participants vote Yes/No on session questions
 - **Guessing challenge**: Players guess the total number of Yes votes
+- **Smart session states**: Draft sessions show "Coming Soon" until live
+- **Consistent navigation**: Always-available "Leave Game" option prevents users getting stuck
 - **Anti-cheat measures**: No interim results shown during live sessions
 - **Point scoring**: Earn points for correct guesses and participation
 - **Cumulative leaderboards**: Track performance across multiple sessions
 
 ### 👨‍💼 Admin Features  
-- **Google OAuth authentication**: Secure admin login
-- **Game management**: Create and manage multiple games
+- **Google OAuth authentication**: Secure admin login with environment isolation
+- **Game management**: Create and manage multiple games with unique codes
 - **Session control**: Create, edit, and control voting sessions
 - **Live monitoring**: Real-time view of active sessions and participants
 - **Game renaming**: Rename games (restricted once sessions go live)
+- **Easy sharing**: Copy game codes directly for quick distribution
 - **Export results**: Download session data and leaderboards
 
 ### 🌐 Technical Highlights
 - **Real-time updates**: WebSocket integration for live session updates
+- **Production-ready sessions**: PostgreSQL-backed session storage for scalability
+- **Secure authentication**: Dual-environment Google OAuth with production isolation
+- **Anti-cheat measures**: No interim results to maintain session integrity
 - **Responsive design**: Works seamlessly on desktop and mobile
-- **Database persistence**: PostgreSQL with proper data relationships
 - **Type safety**: Full TypeScript implementation across frontend and backend
 
 ## 🚀 Quick Start
@@ -44,28 +49,65 @@ A real-time multiplayer voting and guessing game platform where participants vot
    npm install
    ```
 
-3. **Set up environment variables**
+3. **Set up Google OAuth** (see detailed setup below)
+
+4. **Set up environment variables**
    Create a `.env` file with:
    ```env
    DATABASE_URL=your_postgresql_connection_string
-   GOOGLE_CLIENT_ID=your_google_oauth_client_id
-   GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
-   SESSION_SECRET=your_session_secret
+   
+   # Development OAuth credentials
+   GOOGLE_CLIENT_ID=your_dev_google_oauth_client_id
+   GOOGLE_CLIENT_SECRET=your_dev_google_oauth_client_secret
+   
+   # Production OAuth credentials (for deployment)
+   GOOGLE_CLIENT_ID_PROD=your_prod_google_oauth_client_id
+   GOOGLE_CLIENT_SECRET_PROD=your_prod_google_oauth_client_secret
+   PRODUCTION_DOMAIN=your-custom-domain.com
+   
+   # Common settings
+   SESSION_SECRET=your_secure_session_secret
    ADMIN_EMAILS=admin1@example.com,admin2@example.com
    ```
 
-4. **Set up the database**
+5. **Set up the database**
    ```bash
    npm run db:push
    ```
 
-5. **Start the development server**
+6. **Start the development server**
    ```bash
    npm run dev
    ```
 
-6. **Open your browser**
+7. **Open your browser**
    Navigate to `http://localhost:5000`
+
+## 🔐 Google OAuth Setup
+
+This application uses **separate Google OAuth credentials** for development and production environments for enhanced security.
+
+### Creating OAuth Applications
+
+**Step 1: Development OAuth App**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing one
+3. Enable Google+ API (or Google People API)
+4. Go to "Credentials" → "Create Credentials" → "OAuth client ID"
+5. Choose "Web application" type
+6. Add authorized redirect URI: `https://your-repl-name.replit.dev/auth/google/callback`
+7. Save your Client ID and Client Secret
+
+**Step 2: Production OAuth App** 
+1. Create a **separate** OAuth client ID for production
+2. Add authorized redirect URI: `https://your-custom-domain.com/auth/google/callback`
+3. Save your production Client ID and Client Secret
+
+### Why Separate OAuth Apps?
+
+- **🔒 Security**: Dev credentials can't access production
+- **🌐 Domain isolation**: Different callback URLs for each environment  
+- **🚀 Deployment safety**: Automatic environment detection prevents mix-ups
 
 ## 🎯 How to Play
 
@@ -149,13 +191,38 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Contributions are welcome! Please feel free to submit a Pull Request. For major changes, please open an issue first to discuss what you would like to change.
 
-## 🔧 Deployment
+## 🚀 Production Deployment
 
-This application is designed to work seamlessly with Replit Deployments:
-1. Configure your environment variables in Replit Secrets
-2. Use the Deploy button in your Replit workspace
-3. Choose "Autoscale Deployment" for optimal performance
-4. Your app will be live with automatic scaling and TLS certificates
+### Replit Deployment
+1. **Set up production Google OAuth app** (see OAuth Setup section above)
+
+2. **Configure Replit Secrets** with production environment variables:
+   ```
+   GOOGLE_CLIENT_ID_PROD=your_prod_client_id
+   GOOGLE_CLIENT_SECRET_PROD=your_prod_client_secret
+   PRODUCTION_DOMAIN=your-custom-domain.com
+   ADMIN_EMAILS=admin1@example.com,admin2@example.com
+   SESSION_SECRET=your_secure_session_secret
+   DATABASE_URL=(automatically provided by Replit)
+   ```
+
+3. **Deploy using Replit's deployment system**:
+   - Click "Deploy" in your Replit workspace
+   - Choose "Autoscale Deployment" for optimal performance
+   - Your app will be live with automatic HTTPS and scaling
+
+### Production Features
+- ✅ **PostgreSQL session storage** scales automatically
+- ✅ **Trust proxy configuration** for secure cookies behind Replit's infrastructure  
+- ✅ **Environment-specific OAuth** prevents dev credentials in production
+- ✅ **WebSocket support** for real-time features
+- ✅ **Automatic TLS certificates** and domain management
+
+### Custom Domain Setup
+1. In Replit Deployments, configure your custom domain
+2. Update `PRODUCTION_DOMAIN` secret to match your domain
+3. Update your Google OAuth production app redirect URI
+4. Deploy - your app will automatically handle the environment switch
 
 ---
 
