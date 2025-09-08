@@ -27,7 +27,7 @@ interface SessionData {
 export default function AdminLiveView() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { isConnected, socket, monitorSession } = useWebSocket();
+  const { isConnected, socket } = useWebSocket();
   
   const [sessionId, setSessionId] = useState<string>("");
   const [session, setSession] = useState<Session | null>(null);
@@ -48,12 +48,8 @@ export default function AdminLiveView() {
     enabled: !!sessionId,
   });
 
-  // Join session for monitoring when connected
-  useEffect(() => {
-    if (isConnected && sessionId) {
-      monitorSession(sessionId);
-    }
-  }, [isConnected, sessionId, monitorSession]);
+  // Admin monitoring view - uses API data and listens for real-time updates
+  // No session joining needed since this is observation-only
 
   // Clean up when leaving the page
   useEffect(() => {
