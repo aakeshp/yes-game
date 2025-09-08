@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, Play, ExternalLink, Copy, Users } from "lucide-react";
+import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock } from "lucide-react";
 
 interface Session {
   id: string;
@@ -42,6 +42,8 @@ export default function AdminConsole() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showCreateGame, setShowCreateGame] = useState(false);
   const [newGameName, setNewGameName] = useState("");
+  const [isEditingGameName, setIsEditingGameName] = useState(false);
+  const [editGameName, setEditGameName] = useState("");
 
   // Check if admin is authenticated
   // Check authentication with Google OAuth
@@ -221,8 +223,54 @@ export default function AdminConsole() {
     }
   });
 
+  const updateGameMutation = useMutation({
+    mutationFn: async (data: { name: string }) => {
+      const response = await apiRequest("PATCH", `/api/games/${gameId}`, data);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/games", gameId] });
+      toast({ title: "Success", description: "Game name updated successfully" });
+      setIsEditingGameName(false);
+      setEditGameName("");
+    },
+    onError: (error: any) => {
+      const message = error?.message || "Failed to update game name";
+      toast({ title: "Error", description: message, variant: "destructive" });
+      setIsEditingGameName(false);
+      setEditGameName("");
+    }
+  });
+
   const handleLogout = () => {
     logoutMutation.mutate();
+  };
+
+  // Check if game can be renamed (no live or closed sessions)
+  const canRenameGame = sessions ? !sessions.some(session => session.status === 'live' || session.status === 'closed') : true;
+
+  const handleStartEditGameName = () => {
+    if (game) {
+      setEditGameName(game.name);
+      setIsEditingGameName(true);
+    }
+  };
+
+  const handleCancelEditGameName = () => {
+    setIsEditingGameName(false);
+    setEditGameName("");
+  };
+
+  const handleSaveGameName = () => {
+    if (!editGameName.trim()) {
+      toast({ title: "Error", description: "Please enter a game name", variant: "destructive" });
+      return;
+    }
+    if (editGameName.trim() === game?.name) {
+      setIsEditingGameName(false);
+      return;
+    }
+    updateGameMutation.mutate({ name: editGameName.trim() });
   };
 
   const handleUpdateSession = () => {
@@ -479,7 +527,59 @@ export default function AdminConsole() {
                 <div className="space-y-4">
                   <div>
                     <Label>Game Name</Label>
-                    <Input value={game.name} readOnly className="mt-1" data-testid="input-game-name" />
+                    {isEditingGameName ? (
+                      <div className="flex items-center space-x-2 mt-1">
+                        <Input 
+                          value={editGameName}
+                          onChange={(e) => setEditGameName(e.target.value)}
+                          placeholder="Enter game name..."
+                          className="flex-1"
+                          data-testid="input-edit-game-name"
+                        />
+                        <Button 
+                          size="sm" 
+                          onClick={handleSaveGameName}
+                          disabled={updateGameMutation.isPending}
+                          data-testid="button-save-game-name"
+                        >
+                          {updateGameMutation.isPending ? "Saving..." : "Save"}
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={handleCancelEditGameName}
+                          disabled={updateGameMutation.isPending}
+                          data-testid="button-cancel-edit-game-name"
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center space-x-2 mt-1">
+                        <Input 
+                          value={game.name} 
+                          readOnly 
+                          className="flex-1" 
+                          data-testid="input-game-name" 
+                        />
+                        {canRenameGame ? (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={handleStartEditGameName}
+                            data-testid="button-edit-game-name"
+                          >
+                            <Edit2 className="w-4 h-4 mr-1" />
+                            Rename
+                          </Button>
+                        ) : (
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Lock className="w-4 h-4 mr-1" />
+                            <span>Locked after sessions start</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <Label>Join Code</Label>
