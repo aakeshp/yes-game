@@ -33,15 +33,34 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
     console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
   }
   
+  // Determine callback URL at server startup
+  const getCallbackURL = () => {
+    if (process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1') {
+      // Production: Use deployment URL from environment
+      const deploymentUrl = process.env.REPLIT_DEPLOYMENT_URL || process.env.REPLIT_DEV_DOMAIN;
+      if (!deploymentUrl) {
+        console.error('❌ OAuth Setup - Missing deployment URL in production');
+        return 'https://localhost:5000/auth/google/callback'; // Fallback
+      }
+      return `https://${deploymentUrl.replace(/^https?:\/\//, '')}/auth/google/callback`;
+    } else {
+      // Development: Use dev domain
+      const devDomain = process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      return `https://${devDomain}/auth/google/callback`;
+    }
+  };
+
+  const callbackURL = getCallbackURL();
+  
+  // Only log OAuth setup in development
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🔧 OAuth Setup - Callback URL:', callbackURL);
+  }
+
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    callbackURL: function(req: any) {
-      // Dynamically construct callback URL from request
-      const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
-      const host = req.get('host');
-      return `${protocol}://${host}/auth/google/callback`;
-    }
+    callbackURL: callbackURL
   },
   async (accessToken: any, refreshToken: any, profile: any, done: any) => {
     // Check if user email is in admin allowlist
