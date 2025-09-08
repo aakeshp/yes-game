@@ -44,16 +44,11 @@ export function useWebSocket() {
     gameSocket.send('session:submit', { vote, guessYesCount });
   };
 
-  const joinAsAdmin = (sessionId: string) => {
-    gameSocket.send('admin:join', { sessionId });
-  };
-
   return {
     isConnected,
     error,
     socket: gameSocket,
     joinSession,
-    submitVote,
-    joinAsAdmin
+    submitVote
   };
 }
