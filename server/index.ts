@@ -9,16 +9,18 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration
+// Session configuration - isolated from Replit platform
 app.use(session({
   secret: process.env.SESSION_SECRET || 'fallback-dev-secret',
+  name: 'oak-voting-game-session', // Unique session name to avoid conflicts
   resave: false,
   saveUninitialized: false,
   cookie: {
     secure: process.env.NODE_ENV === 'production',
     httpOnly: true,
     sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    domain: process.env.NODE_ENV === 'production' ? '.replit.app' : undefined,
+    // NO domain setting - defaults to exact hostname only
+    // This prevents interference with Replit platform cookies
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
