@@ -36,8 +36,12 @@ if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
   passport.use(new GoogleStrategy({
     clientID: process.env.GOOGLE_CLIENT_ID,
     clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    // Remove callbackURL - let Passport auto-detect from request headers
-    // This allows it to work with any domain (dev, production, custom domains)
+    callbackURL: (req: any) => {
+      // Dynamically construct callback URL from request
+      const protocol = req.get('x-forwarded-proto') || req.protocol || 'https';
+      const host = req.get('host');
+      return `${protocol}://${host}/auth/google/callback`;
+    }
   },
   async (accessToken, refreshToken, profile, done) => {
     // Check if user email is in admin allowlist
