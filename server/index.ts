@@ -27,18 +27,18 @@ app.use(passport.session());
 // Google OAuth Strategy with environment-specific configuration
 const getOAuthConfig = () => {
   if (process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1') {
-    // Production: Use configurable domain and separate credentials
+    // Production: Use configurable domain and production-specific credentials
     const productionDomain = process.env.PRODUCTION_DOMAIN;
-    const clientID = process.env.GOOGLE_CLIENT_ID_PROD || process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET_PROD || process.env.GOOGLE_CLIENT_SECRET;
+    const clientID = process.env.GOOGLE_CLIENT_ID_PROD;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET_PROD;
     
     if (!productionDomain) {
       console.error('❌ OAuth Setup - PRODUCTION_DOMAIN environment variable required for production');
       throw new Error('PRODUCTION_DOMAIN environment variable required for production');
     }
     if (!clientID || !clientSecret) {
-      console.error('❌ OAuth Setup - Missing Google OAuth credentials for production');
-      throw new Error('Missing Google OAuth credentials for production');
+      console.error('❌ OAuth Setup - GOOGLE_CLIENT_ID_PROD and GOOGLE_CLIENT_SECRET_PROD required for production');
+      throw new Error('GOOGLE_CLIENT_ID_PROD and GOOGLE_CLIENT_SECRET_PROD required for production');
     }
     
     return {
@@ -47,18 +47,18 @@ const getOAuthConfig = () => {
       callbackURL: `https://${productionDomain}/auth/google/callback`
     };
   } else {
-    // Development: Use Replit's dev domain and dev credentials
+    // Development: Use Replit's dev domain and main credentials (GOOGLE_CLIENT_ID/SECRET are for dev)
     const devDomain = process.env.REPLIT_DEV_DOMAIN;
-    const clientID = process.env.GOOGLE_CLIENT_ID_DEV || process.env.GOOGLE_CLIENT_ID;
-    const clientSecret = process.env.GOOGLE_CLIENT_SECRET_DEV || process.env.GOOGLE_CLIENT_SECRET;
+    const clientID = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
     
     if (!devDomain) {
       console.error('❌ OAuth Setup - REPLIT_DEV_DOMAIN not available in development');
       throw new Error('REPLIT_DEV_DOMAIN not available in development');
     }
     if (!clientID || !clientSecret) {
-      console.error('❌ OAuth Setup - Missing Google OAuth credentials for development');
-      throw new Error('Missing Google OAuth credentials for development');
+      console.error('❌ OAuth Setup - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required for development');
+      throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required for development');
     }
     
     return {
@@ -75,7 +75,7 @@ try {
   // Only log OAuth setup in development
   if (process.env.NODE_ENV === 'development') {
     console.log('🔧 OAuth Setup - Environment:', process.env.NODE_ENV);
-    console.log('🔧 OAuth Setup - Using dev credentials:', !!process.env.GOOGLE_CLIENT_ID_DEV);
+    console.log('🔧 OAuth Setup - Using main credentials for dev:', !!process.env.GOOGLE_CLIENT_ID);
     console.log('🔧 OAuth Setup - Callback URL:', oauthConfig.callbackURL);
     console.log('🔧 OAuth Setup - Admin Emails configured:', process.env.ADMIN_EMAILS ? 'SET' : 'NOT SET');
   }
