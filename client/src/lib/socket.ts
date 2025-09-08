@@ -14,7 +14,7 @@ export class GameSocket {
       this.isConnecting = true;
       
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const wsUrl = `${protocol}//${window.location.host}/game-ws`;
       
       this.ws = new WebSocket(wsUrl);
 

@@ -16,7 +16,7 @@ interface WebSocketConnection {
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  const wss = new WebSocketServer({ server: httpServer, path: '/game-ws' });
   
   const connections = new Map<WebSocket, WebSocketConnection>();
   const sessionRooms = new Map<string, Set<WebSocket>>();
