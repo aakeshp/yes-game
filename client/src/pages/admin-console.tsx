@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock } from "lucide-react";
+import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock, ArrowLeft } from "lucide-react";
 
 interface Session {
   id: string;
@@ -490,6 +490,15 @@ export default function AdminConsole() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-4">
                 <span className="text-sm text-muted-foreground">Admin: {adminUser?.name || adminUser?.email}</span>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate("/admin")}
+                  data-testid="button-back-games"
+                >
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Games
+                </Button>
                 <Button 
                   variant="ghost" 
                   size="sm" 
