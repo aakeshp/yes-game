@@ -537,13 +537,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
               const submissions = await storage.getSubmissionsBySessionId(session.id);
               const participantSubmission = submissions.find(s => s.participantId === participant.id);
               
+              // Calculate actual Yes count for this session
+              const actualYesCount = submissions.filter(s => s.vote === 'YES').length;
+              
               sessionBreakdown.push({
                 sessionId: session.id,
                 question: session.question,
                 points: participantPoints.points,
                 status: session.status,
                 vote: participantSubmission?.vote || null,
-                guess: participantSubmission?.guessYesCount || null
+                guess: participantSubmission?.guessYesCount || null,
+                actualYesCount: actualYesCount
               });
               totalPoints += participantPoints.points;
               sessionsPlayed++;

@@ -22,6 +22,7 @@ interface GameWithDetailedLeaderboard {
       status: string;
       vote: "YES" | "NO" | null;
       guess: number | null;
+      actualYesCount: number;
     }>;
   }>;
 }
@@ -232,11 +233,18 @@ export default function AdminLeaderboard() {
                                         Voted: {session.vote}
                                       </Badge>
                                     )}
-                                    {session.guess !== null && (
+                                    {session.guess !== null && session.guess !== undefined ? (
                                       <Badge variant="outline" className="text-xs">
                                         Guessed: {session.guess}
                                       </Badge>
+                                    ) : (
+                                      <Badge variant="outline" className="text-xs opacity-50">
+                                        No guess
+                                      </Badge>
                                     )}
+                                    <Badge variant="secondary" className="text-xs">
+                                      Actual: {session.actualYesCount} Yes
+                                    </Badge>
                                   </div>
                                 </div>
                                 <div className="text-right ml-4">
