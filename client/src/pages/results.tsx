@@ -209,13 +209,13 @@ export default function Results() {
               <div className="bg-muted rounded-lg p-6 mb-6">
                 <div className="grid grid-cols-2 gap-8">
                   <div className="text-center">
-                    <div className="text-4xl font-bold text-secondary mb-2" data-testid="text-yes-count">
+                    <div className="text-4xl font-bold text-primary mb-2" data-testid="text-yes-count">
                       {results.yesCount}
                     </div>
                     <div className="text-lg font-medium text-foreground">YES Votes</div>
                   </div>
                   <div className="text-center">
-                    <div className="text-4xl font-bold text-destructive mb-2" data-testid="text-no-count">
+                    <div className="text-4xl font-bold text-primary mb-2" data-testid="text-no-count">
                       {results.noCount}
                     </div>
                     <div className="text-lg font-medium text-foreground">NO Votes</div>
