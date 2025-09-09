@@ -306,8 +306,8 @@ export default function AdminLiveView() {
                   </div>
                   <div className="text-center">
                     <div className="flex items-center justify-center mb-2">
-                      <Monitor className="w-6 h-6 text-secondary mr-2" />
-                      <div className="text-2xl font-bold text-secondary" data-testid="text-submission-count">
+                      <Monitor className="w-6 h-6 text-primary mr-2" />
+                      <div className="text-2xl font-bold text-primary" data-testid="text-submission-count">
                         {submissionCount}
                       </div>
                     </div>
