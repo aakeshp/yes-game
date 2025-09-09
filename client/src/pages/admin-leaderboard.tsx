@@ -20,6 +20,8 @@ interface GameWithDetailedLeaderboard {
       question: string;
       points: number;
       status: string;
+      vote: "YES" | "NO" | null;
+      guess: number | null;
     }>;
   }>;
 }
@@ -86,11 +88,11 @@ export default function AdminLeaderboard() {
   const getRankIcon = (position: number) => {
     switch (position) {
       case 1:
-        return <Trophy className="w-6 h-6 text-primary" />;
+        return <Trophy className="w-6 h-6 text-muted-foreground" />;
       case 2:
         return <Medal className="w-6 h-6 text-muted-foreground" />;
       case 3:
-        return <Award className="w-6 h-6 text-accent" />;
+        return <Award className="w-6 h-6 text-muted-foreground" />;
       default:
         return <span className="w-6 h-6 flex items-center justify-center text-muted-foreground font-bold">#{position}</span>;
     }
@@ -221,13 +223,25 @@ export default function AdminLeaderboard() {
                                   <p className="text-sm font-medium text-foreground truncate">
                                     {session.question}
                                   </p>
-                                  <Badge variant={session.status === 'closed' ? 'default' : 'secondary'} className="text-xs mt-1">
-                                    {session.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Badge variant={session.status === 'closed' ? 'default' : 'secondary'} className="text-xs">
+                                      {session.status}
+                                    </Badge>
+                                    {session.vote && (
+                                      <Badge variant={session.vote === "YES" ? "secondary" : "destructive"} className="text-xs">
+                                        Voted: {session.vote}
+                                      </Badge>
+                                    )}
+                                    {session.guess !== null && (
+                                      <Badge variant="outline" className="text-xs">
+                                        Guessed: {session.guess}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="text-right ml-4">
                                   <div className={`text-lg font-semibold ${
-                                    session.points > 0 ? 'text-secondary' : 'text-muted-foreground'
+                                    session.points > 0 ? 'text-primary' : 'text-muted-foreground'
                                   }`}>
                                     {session.points} pts
                                   </div>

@@ -533,11 +533,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const participantPoints = sessionPointsRecords.find(sp => sp.participantId === participant.id);
             
             if (participantPoints) {
+              // Get submission data to include vote and guess
+              const submissions = await storage.getSubmissionsBySessionId(session.id);
+              const participantSubmission = submissions.find(s => s.participantId === participant.id);
+              
               sessionBreakdown.push({
                 sessionId: session.id,
                 question: session.question,
                 points: participantPoints.points,
-                status: session.status
+                status: session.status,
+                vote: participantSubmission?.vote || null,
+                guess: participantSubmission?.guessYesCount || null
               });
               totalPoints += participantPoints.points;
               sessionsPlayed++;
