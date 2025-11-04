@@ -436,6 +436,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Overall game leaderboard - shows total points across all closed sessions
+  app.get('/api/games/:gameId/leaderboard', async (req, res) => {
+    try {
+      const { gameId } = req.params;
+      
+      const game = await storage.getGame(gameId);
+      if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+
+      // Get all closed sessions for this game
+      const allSessions = await storage.getSessionsByGameId(gameId);
+      const closedSessions = allSessions.filter(s => s.status === 'closed');
+
+      // Get all participants for this game
+      const participants = await storage.getParticipantsByGameId(gameId);
+      
+      // Pre-fetch all session points for closed sessions (optimization)
+      const sessionPointsMap = new Map<string, any[]>();
+      for (const session of closedSessions) {
+        const sessionPoints = await storage.getSessionPointsBySessionId(session.id);
+        sessionPointsMap.set(session.id, sessionPoints);
+      }
+      
+      // Calculate overall leaderboard
+      const leaderboard = [];
+      
+      for (const participant of participants) {
+        let totalPoints = 0;
+        let sessionsPlayed = 0;
+        
+        // Sum points from all closed sessions using pre-fetched data
+        for (const session of closedSessions) {
+          const sessionPoints = sessionPointsMap.get(session.id) || [];
+          const participantPoints = sessionPoints.find(sp => sp.participantId === participant.id);
+          
+          if (participantPoints) {
+            totalPoints += participantPoints.points;
+            sessionsPlayed++;
+          }
+        }
+        
+        // Only include participants who have played at least one session
+        if (sessionsPlayed > 0) {
+          leaderboard.push({
+            participantId: participant.id,
+            displayName: participant.displayName,
+            totalPoints,
+            sessionsPlayed
+          });
+        }
+      }
+      
+      // Sort by total points descending
+      leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
+      
+      res.json({
+        leaderboard
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch game leaderboard' });
+    }
+  });
+
   // Historical leaderboard - shows cumulative points up to a specific session
   app.get('/api/games/:gameId/historical-leaderboard/:sessionId', async (req, res) => {
     try {

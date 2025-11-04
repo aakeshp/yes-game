@@ -126,6 +126,7 @@ export type GameWithLeaderboard = Game & {
 
 export type SessionResults = {
   sessionId: string;
+  gameId: string;
   question: string;
   yesCount: number;
   noCount: number;

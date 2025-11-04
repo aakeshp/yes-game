@@ -589,6 +589,7 @@ export class DatabaseStorage implements IStorage {
 
       const results: SessionResults = {
         sessionId: session.id,
+        gameId: session.gameId,
         question: session.question,
         yesCount: yesVotes,
         noCount: noVotes,
@@ -635,6 +636,7 @@ export class DatabaseStorage implements IStorage {
 
     return {
       sessionId: session.id,
+      gameId: session.gameId,
       question: session.question,
       yesCount: yesVotes,
       noCount: noVotes,
