@@ -45,6 +45,10 @@ export default function GameLobby() {
     const saved = localStorage.getItem("leaderboardCollapsed");
     return saved === "true";
   });
+  const [showAllLeaderboard, setShowAllLeaderboard] = useState(() => {
+    const saved = localStorage.getItem("showAllLeaderboard");
+    return saved === "true";
+  });
   const { socket } = useWebSocket();
 
   // Load saved data from localStorage
@@ -210,6 +214,12 @@ export default function GameLobby() {
     const newState = !isLeaderboardCollapsed;
     setIsLeaderboardCollapsed(newState);
     localStorage.setItem("leaderboardCollapsed", String(newState));
+  };
+
+  const toggleShowAllLeaderboard = () => {
+    const newState = !showAllLeaderboard;
+    setShowAllLeaderboard(newState);
+    localStorage.setItem("showAllLeaderboard", String(newState));
   };
 
   const sortSessions = (sessions: Session[]) => {
@@ -388,7 +398,9 @@ export default function GameLobby() {
                       <>
                         <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
                           <div className="divide-y divide-border">
-                            {calculateRanks(leaderboardData.leaderboard).slice(0, 10).map(({ entry, rank }, index) => (
+                            {calculateRanks(leaderboardData.leaderboard)
+                              .slice(0, showAllLeaderboard ? leaderboardData.leaderboard.length : 10)
+                              .map(({ entry, rank }, index) => (
                               <div 
                                 key={entry.participantId} 
                                 className={`flex items-center justify-between p-4 transition-colors hover:bg-muted ${
@@ -427,9 +439,20 @@ export default function GameLobby() {
                           </div>
                         </div>
                         {leaderboardData.leaderboard.length > 10 && (
-                          <p className="text-sm text-muted-foreground text-center mt-3">
-                            Showing top 10 of {leaderboardData.leaderboard.length} participants
-                          </p>
+                          <div className="text-center mt-4">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={toggleShowAllLeaderboard}
+                              data-testid="button-show-more-leaderboard"
+                            >
+                              {showAllLeaderboard ? (
+                                <>Show Less</>
+                              ) : (
+                                <>Show More ({leaderboardData.leaderboard.length - 10} more)</>
+                              )}
+                            </Button>
+                          </div>
                         )}
                       </>
                     )}
