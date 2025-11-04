@@ -231,6 +231,23 @@ export default function GameLobby() {
     });
   };
 
+  const calculateRanks = (leaderboard: any[]) => {
+    if (!leaderboard || leaderboard.length === 0) return [];
+    
+    const rankedEntries: Array<{entry: any, rank: number}> = [];
+    let currentRank = 1;
+    
+    leaderboard.forEach((entry, index) => {
+      if (index > 0 && entry.totalPoints < leaderboard[index - 1].totalPoints) {
+        // Points decreased, update rank to current position
+        currentRank = index + 1;
+      }
+      rankedEntries.push({ entry, rank: currentRank });
+    });
+    
+    return rankedEntries;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation Header */}
@@ -371,22 +388,22 @@ export default function GameLobby() {
                       <>
                         <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
                           <div className="divide-y divide-border">
-                            {leaderboardData.leaderboard.slice(0, 10).map((entry, index) => (
+                            {calculateRanks(leaderboardData.leaderboard).slice(0, 10).map(({ entry, rank }, index) => (
                               <div 
                                 key={entry.participantId} 
                                 className={`flex items-center justify-between p-4 transition-colors hover:bg-muted ${
-                                  index < 3 ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''
+                                  rank <= 3 ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''
                                 }`}
                                 data-testid={`leaderboard-row-${index}`}
                               >
                                 <div className="flex items-center gap-4 flex-1">
                                   <div className="flex items-center justify-center w-8 h-8">
-                                    {index === 0 && <span className="text-2xl">🥇</span>}
-                                    {index === 1 && <span className="text-2xl">🥈</span>}
-                                    {index === 2 && <span className="text-2xl">🥉</span>}
-                                    {index > 2 && (
+                                    {rank === 1 && <span className="text-2xl">🥇</span>}
+                                    {rank === 2 && <span className="text-2xl">🥈</span>}
+                                    {rank === 3 && <span className="text-2xl">🥉</span>}
+                                    {rank > 3 && (
                                       <span className="text-sm font-semibold text-muted-foreground">
-                                        #{index + 1}
+                                        #{rank}
                                       </span>
                                     )}
                                   </div>

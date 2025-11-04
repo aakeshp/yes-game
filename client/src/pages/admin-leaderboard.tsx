@@ -59,6 +59,23 @@ export default function AdminLeaderboard() {
     navigate(`/admin/games/${gameId}`);
   };
 
+  const calculateRanks = (leaderboard: GameWithDetailedLeaderboard['leaderboard']) => {
+    if (!leaderboard || leaderboard.length === 0) return [];
+    
+    const rankedEntries: Array<{entry: GameWithDetailedLeaderboard['leaderboard'][0], rank: number}> = [];
+    let currentRank = 1;
+    
+    leaderboard.forEach((entry, index) => {
+      if (index > 0 && entry.totalPoints < leaderboard[index - 1].totalPoints) {
+        // Points decreased, update rank to current position
+        currentRank = index + 1;
+      }
+      rankedEntries.push({ entry, rank: currentRank });
+    });
+    
+    return rankedEntries;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -156,13 +173,13 @@ export default function AdminLeaderboard() {
               </div>
             ) : (
               <div className="space-y-3">
-                {gameData.leaderboard.map((participant, index) => (
+                {calculateRanks(gameData.leaderboard).map(({ entry: participant, rank }) => (
                   <Card key={participant.participantId} className="border border-border">
                     <CardContent className="p-4">
                       {/* Compact Overview Row */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-4 flex-1">
-                          {getRankIcon(index + 1)}
+                          {getRankIcon(rank)}
                           <div className="flex-1">
                             <h3 className="text-lg font-semibold text-foreground">
                               {participant.displayName}
