@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 interface Session {
   id: string;
@@ -40,6 +41,10 @@ export default function GameLobby() {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [hasJoinedGame, setHasJoinedGame] = useState(false);
   const [isGameCodeChanged, setIsGameCodeChanged] = useState(false);
+  const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState(() => {
+    const saved = localStorage.getItem("leaderboardCollapsed");
+    return saved === "true";
+  });
   const { socket } = useWebSocket();
 
   // Load saved data from localStorage
@@ -201,6 +206,12 @@ export default function GameLobby() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const toggleLeaderboard = () => {
+    const newState = !isLeaderboardCollapsed;
+    setIsLeaderboardCollapsed(newState);
+    localStorage.setItem("leaderboardCollapsed", String(newState));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation Header */}
@@ -309,69 +320,91 @@ export default function GameLobby() {
             {/* Overall Leaderboard */}
             {hasJoinedGame && (
               <div className="mt-8 border-t border-border pt-8">
-                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                  <span className="text-2xl">🏆</span> Overall Leaderboard
-                </h3>
-                {leaderboardLoading && (
-                  <div className="bg-muted/50 rounded-lg border border-border p-8 text-center">
-                    <p className="text-muted-foreground">Loading leaderboard...</p>
-                  </div>
-                )}
-                {!leaderboardLoading && leaderboardData && leaderboardData.leaderboard.length > 0 && (
+                <div 
+                  className="flex items-center justify-between mb-4 cursor-pointer group"
+                  onClick={toggleLeaderboard}
+                  data-testid="button-toggle-leaderboard"
+                >
+                  <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <span className="text-2xl">🏆</span> Overall Leaderboard
+                  </h3>
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    className="group-hover:bg-muted"
+                  >
+                    {isLeaderboardCollapsed ? (
+                      <ChevronDown className="h-5 w-5" />
+                    ) : (
+                      <ChevronUp className="h-5 w-5" />
+                    )}
+                  </Button>
+                </div>
+                
+                {!isLeaderboardCollapsed && (
                   <>
-                    <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
-                      <div className="divide-y divide-border">
-                        {leaderboardData.leaderboard.slice(0, 10).map((entry, index) => (
-                          <div 
-                            key={entry.participantId} 
-                            className={`flex items-center justify-between p-4 transition-colors hover:bg-muted ${
-                              index < 3 ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''
-                            }`}
-                            data-testid={`leaderboard-row-${index}`}
-                          >
-                            <div className="flex items-center gap-4 flex-1">
-                              <div className="flex items-center justify-center w-8 h-8">
-                                {index === 0 && <span className="text-2xl">🥇</span>}
-                                {index === 1 && <span className="text-2xl">🥈</span>}
-                                {index === 2 && <span className="text-2xl">🥉</span>}
-                                {index > 2 && (
-                                  <span className="text-sm font-semibold text-muted-foreground">
-                                    #{index + 1}
-                                  </span>
-                                )}
-                              </div>
-                              <div className="flex-1">
-                                <p className="font-medium text-foreground" data-testid={`text-participant-name-${index}`}>
-                                  {entry.displayName}
-                                </p>
-                                <p className="text-sm text-muted-foreground">
-                                  {entry.sessionsPlayed} session{entry.sessionsPlayed !== 1 ? 's' : ''} played
-                                </p>
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-2xl font-bold text-primary" data-testid={`text-points-${index}`}>
-                                {entry.totalPoints}
-                              </p>
-                              <p className="text-xs text-muted-foreground">points</p>
-                            </div>
-                          </div>
-                        ))}
+                    {leaderboardLoading && (
+                      <div className="bg-muted/50 rounded-lg border border-border p-8 text-center">
+                        <p className="text-muted-foreground">Loading leaderboard...</p>
                       </div>
-                    </div>
-                    {leaderboardData.leaderboard.length > 10 && (
-                      <p className="text-sm text-muted-foreground text-center mt-3">
-                        Showing top 10 of {leaderboardData.leaderboard.length} participants
-                      </p>
+                    )}
+                    {!leaderboardLoading && leaderboardData && leaderboardData.leaderboard.length > 0 && (
+                      <>
+                        <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
+                          <div className="divide-y divide-border">
+                            {leaderboardData.leaderboard.slice(0, 10).map((entry, index) => (
+                              <div 
+                                key={entry.participantId} 
+                                className={`flex items-center justify-between p-4 transition-colors hover:bg-muted ${
+                                  index < 3 ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''
+                                }`}
+                                data-testid={`leaderboard-row-${index}`}
+                              >
+                                <div className="flex items-center gap-4 flex-1">
+                                  <div className="flex items-center justify-center w-8 h-8">
+                                    {index === 0 && <span className="text-2xl">🥇</span>}
+                                    {index === 1 && <span className="text-2xl">🥈</span>}
+                                    {index === 2 && <span className="text-2xl">🥉</span>}
+                                    {index > 2 && (
+                                      <span className="text-sm font-semibold text-muted-foreground">
+                                        #{index + 1}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="font-medium text-foreground" data-testid={`text-participant-name-${index}`}>
+                                      {entry.displayName}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      {entry.sessionsPlayed} session{entry.sessionsPlayed !== 1 ? 's' : ''} played
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-2xl font-bold text-primary" data-testid={`text-points-${index}`}>
+                                    {entry.totalPoints}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">points</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {leaderboardData.leaderboard.length > 10 && (
+                          <p className="text-sm text-muted-foreground text-center mt-3">
+                            Showing top 10 of {leaderboardData.leaderboard.length} participants
+                          </p>
+                        )}
+                      </>
+                    )}
+                    {!leaderboardLoading && leaderboardData && leaderboardData.leaderboard.length === 0 && (
+                      <div className="bg-muted/50 rounded-lg border border-border p-8 text-center">
+                        <p className="text-muted-foreground">
+                          No participants have completed any sessions yet. Complete a session to appear on the leaderboard!
+                        </p>
+                      </div>
                     )}
                   </>
-                )}
-                {!leaderboardLoading && leaderboardData && leaderboardData.leaderboard.length === 0 && (
-                  <div className="bg-muted/50 rounded-lg border border-border p-8 text-center">
-                    <p className="text-muted-foreground">
-                      No participants have completed any sessions yet. Complete a session to appear on the leaderboard!
-                    </p>
-                  </div>
                 )}
               </div>
             )}
