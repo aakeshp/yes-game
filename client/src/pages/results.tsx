@@ -24,17 +24,6 @@ interface SessionResults {
   }>;
 }
 
-interface Game {
-  id: string;
-  name: string;
-  leaderboard: Array<{
-    participantId: string;
-    displayName: string;
-    totalPoints: number;
-    sessionsPlayed: number;
-  }>;
-}
-
 interface SessionWithResults {
   id: string;
   gameId: string;
@@ -65,28 +54,6 @@ export default function Results() {
     },
     refetchIntervalInBackground: false,
   });
-
-  const { data: game } = useQuery<Game>({
-    queryKey: ["/api/games", session?.gameId, "historical-leaderboard", sessionId],
-    queryFn: () => {
-      if (!session?.gameId || !sessionId) throw new Error('Missing required data');
-      return fetch(`/api/games/${session.gameId}/historical-leaderboard/${sessionId}`)
-        .then(res => res.json());
-    },
-    enabled: !!session?.gameId && !!session?.results && !!sessionId, // Wait for all required data
-    refetchOnMount: true, // Always fetch fresh data when component mounts
-  });
-
-  // Invalidate cache when session results become available to ensure fresh historical leaderboard
-  useEffect(() => {
-    if (session?.results && session?.gameId && sessionId) {
-      // Invalidate historical leaderboard data for this session
-      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId, "historical-leaderboard", sessionId] });
-      // Also invalidate current game data for other views
-      queryClient.invalidateQueries({ queryKey: ["/api/games", session.gameId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/games", session.gameId, "detailed-leaderboard"] });
-    }
-  }, [session?.results, session?.gameId, sessionId, queryClient]);
 
   const handleBackToLobby = () => {
     // Invalidate ALL relevant caches to ensure fresh data in lobby
@@ -333,43 +300,6 @@ export default function Results() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Game Leaderboard */}
-        {game?.leaderboard && game.leaderboard.length > 0 && (
-          <Card className="shadow-lg border border-border">
-            <CardHeader>
-              <CardTitle>Game Leaderboard</CardTitle>
-              <p className="text-sm text-muted-foreground">Cumulative points across all sessions</p>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {game.leaderboard.slice(0, 10).map((player: Game['leaderboard'][0], index: number) => (
-                  <div key={player.participantId} className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                    <div className="flex items-center space-x-4">
-                      <div className="bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm">
-                        {index + 1}
-                      </div>
-                      <div>
-                        <div className="font-medium text-foreground" data-testid={`leaderboard-name-${player.participantId}`}>
-                          {player.displayName}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {player.sessionsPlayed} sessions played
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-xl font-bold text-primary" data-testid={`leaderboard-points-${player.participantId}`}>
-                        {player.totalPoints}
-                      </div>
-                      <div className="text-sm text-muted-foreground">total points</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
     </div>
   );
