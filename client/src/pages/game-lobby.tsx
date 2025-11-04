@@ -212,6 +212,25 @@ export default function GameLobby() {
     localStorage.setItem("leaderboardCollapsed", String(newState));
   };
 
+  const sortSessions = (sessions: Session[]) => {
+    const statusPriority: Record<string, number> = {
+      'live': 1,
+      'closed': 2,
+      'draft': 3,
+      'canceled': 4
+    };
+
+    return [...sessions].sort((a, b) => {
+      // First sort by status priority
+      const priorityDiff = statusPriority[a.status] - statusPriority[b.status];
+      if (priorityDiff !== 0) return priorityDiff;
+
+      // Within same status, sort by date (newest first)
+      // Sessions might not have createdAt, so we'll use the session order as fallback
+      return 0; // Keep original order within same status
+    });
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation Header */}
@@ -414,7 +433,7 @@ export default function GameLobby() {
               <div className="mt-8 border-t border-border pt-8">
                 <h3 className="text-lg font-semibold text-foreground mb-4">Available Sessions</h3>
                 <div className="space-y-3">
-                  {sessions.map((session: Session) => (
+                  {sortSessions(sessions).map((session: Session) => (
                     <div key={session.id} className="bg-muted rounded-lg p-4 border border-border hover:shadow-md transition-shadow">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
