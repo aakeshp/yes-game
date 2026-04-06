@@ -25,7 +25,6 @@ const THEME_CONFIG = {
     },
     textColor: "text-violet-200",
     accentColor: "text-violet-400",
-    glowClass: "psychic-glow",
   },
   gameshow: {
     bg: "bg-gradient-to-br from-yellow-950 via-amber-900 to-orange-950",
@@ -41,7 +40,6 @@ const THEME_CONFIG = {
     },
     textColor: "text-yellow-100",
     accentColor: "text-amber-400",
-    glowClass: "gameshow-glow",
   },
   fireworks: {
     bg: "bg-gradient-to-br from-blue-950 via-indigo-900 to-slate-950",
@@ -57,7 +55,6 @@ const THEME_CONFIG = {
     },
     textColor: "text-blue-100",
     accentColor: "text-cyan-400",
-    glowClass: "fireworks-glow",
   },
 };
 
@@ -152,12 +149,18 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
     if (!type || confettiFired.current) return;
     confettiFired.current = true;
 
+    let fireworksInterval: ReturnType<typeof setInterval> | null = null;
+
     if (theme === "fireworks") {
       const duration = intense ? 2200 : 1200;
       const end = Date.now() + duration;
       const colors = ["#60a5fa", "#818cf8", "#c4b5fd", "#38bdf8", "#facc15"];
-      const interval = setInterval(() => {
-        if (Date.now() > end) { clearInterval(interval); return; }
+      fireworksInterval = setInterval(() => {
+        if (Date.now() > end) {
+          clearInterval(fireworksInterval!);
+          fireworksInterval = null;
+          return;
+        }
         confetti({
           particleCount: intense ? 6 : 3,
           angle: 60,
@@ -188,7 +191,10 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
     }
 
     const timer = setTimeout(() => setVisible(false), 3500);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (fireworksInterval !== null) clearInterval(fireworksInterval);
+    };
   }, [type, theme, intense]);
 
   if (!type) return null;
