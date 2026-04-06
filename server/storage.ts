@@ -617,12 +617,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async recalculateSessionPoints(sessionId: string): Promise<void> {
-    const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
-    const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
-    for (const submission of sessionSubmissions) {
-      const points = this.calculatePoints(submission.guessYesCount, yesVotes);
-      await this.upsertSessionPoints(sessionId, submission.participantId, points);
-    }
+    await db.transaction(async (tx) => {
+      const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
+      const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
+      for (const submission of sessionSubmissions) {
+        const points = this.calculatePoints(submission.guessYesCount, yesVotes);
+        await this.upsertSessionPointsInTransaction(tx, sessionId, submission.participantId, points);
+      }
+    });
   }
 
   private async getStoredSessionResults(sessionId: string): Promise<SessionResults> {

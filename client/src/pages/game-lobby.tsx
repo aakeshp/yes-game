@@ -109,10 +109,17 @@ export default function GameLobby() {
       queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "sessions"] });
     };
 
+    const handleLeaderboardUpdated = (data: any) => {
+      if (data?.gameId !== currentGameId) return;
+      queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "leaderboard"] });
+    };
+
     socket.on('session:results', handleSessionResults);
+    socket.on('leaderboard:updated', handleLeaderboardUpdated);
 
     return () => {
       socket.off('session:results', handleSessionResults);
+      socket.off('leaderboard:updated', handleLeaderboardUpdated);
     };
   }, [currentGameId, socket]);
 

@@ -225,6 +225,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }));
   }
 
+  function broadcastToAll(message: any) {
+    connections.forEach((_, ws) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(message));
+      }
+    });
+  }
+
   function broadcastToSession(sessionId: string, message: any, excludeAdmin = false) {
     const room = sessionRooms.get(sessionId);
     if (!room) return;
@@ -681,6 +689,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       await storage.recalculateSessionPoints(sessionId);
+
+      broadcastToAll({
+        type: 'leaderboard:updated',
+        payload: { gameId: session.gameId }
+      });
 
       res.json({ success: true });
     } catch (error) {
