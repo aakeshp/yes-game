@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Trophy, Medal, Award, ChevronDown, ChevronRight, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ArrowLeft, Trophy, Medal, Award, ChevronDown, ChevronRight, Eye, Pencil } from "lucide-react";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface GameWithDetailedLeaderboard {
   id: string;
@@ -27,12 +33,22 @@ interface GameWithDetailedLeaderboard {
   }>;
 }
 
+interface EditState {
+  sessionId: string;
+  participantId: string;
+  participantName: string;
+  question: string;
+  vote: "YES" | "NO";
+  guess: number;
+}
+
 export default function AdminLeaderboard() {
   const [location, navigate] = useLocation();
   const [gameId, setGameId] = useState<string>("");
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
+  const [editState, setEditState] = useState<EditState | null>(null);
+  const { toast } = useToast();
 
-  // Extract game ID from URL
   useEffect(() => {
     const match = location.match(/\/admin\/games\/(.+)\/leaderboard/);
     if (match) {
@@ -55,6 +71,35 @@ export default function AdminLeaderboard() {
     enabled: !!gameId,
   });
 
+  const editMutation = useMutation({
+    mutationFn: async (data: { sessionId: string; participantId: string; vote: string; guessYesCount: number }) => {
+      await apiRequest(
+        "PATCH",
+        `/api/admin/sessions/${data.sessionId}/participants/${data.participantId}/submission`,
+        { vote: data.vote, guessYesCount: data.guessYesCount }
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games", gameId, "detailed-leaderboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/games", gameId, "leaderboard"] });
+      setEditState(null);
+      toast({ title: "Submission updated", description: "Points have been recalculated." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update submission.", variant: "destructive" });
+    }
+  });
+
+  const handleSaveEdit = () => {
+    if (!editState) return;
+    editMutation.mutate({
+      sessionId: editState.sessionId,
+      participantId: editState.participantId,
+      vote: editState.vote,
+      guessYesCount: editState.guess,
+    });
+  };
+
   const handleBackToAdmin = () => {
     navigate(`/admin/games/${gameId}`);
   };
@@ -67,7 +112,6 @@ export default function AdminLeaderboard() {
     
     leaderboard.forEach((entry, index) => {
       if (index > 0 && entry.totalPoints < leaderboard[index - 1].totalPoints) {
-        // Points decreased, update rank to current position
         currentRank = index + 1;
       }
       rankedEntries.push({ entry, rank: currentRank });
@@ -264,12 +308,29 @@ export default function AdminLeaderboard() {
                                     </Badge>
                                   </div>
                                 </div>
-                                <div className="text-right ml-4">
-                                  <div className={`text-lg font-semibold ${
-                                    session.points > 0 ? 'text-primary' : 'text-muted-foreground'
-                                  }`}>
-                                    {session.points} pts
+                                <div className="flex items-center gap-3 ml-4">
+                                  <div className="text-right">
+                                    <div className={`text-lg font-semibold ${
+                                      session.points > 0 ? 'text-primary' : 'text-muted-foreground'
+                                    }`}>
+                                      {session.points} pts
+                                    </div>
                                   </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setEditState({
+                                      sessionId: session.sessionId,
+                                      participantId: participant.participantId,
+                                      participantName: participant.displayName,
+                                      question: session.question,
+                                      vote: session.vote ?? "YES",
+                                      guess: session.guess ?? 0,
+                                    })}
+                                    data-testid={`button-edit-submission-${session.sessionId}-${participant.participantId}`}
+                                  >
+                                    <Pencil className="w-4 h-4" />
+                                  </Button>
                                 </div>
                               </div>
                             ))}
@@ -284,6 +345,60 @@ export default function AdminLeaderboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Submission Dialog */}
+      <Dialog open={!!editState} onOpenChange={(open) => { if (!open) setEditState(null); }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Submission</DialogTitle>
+          </DialogHeader>
+          {editState && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Player</p>
+                <p className="font-medium">{editState.participantName}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Question</p>
+                <p className="font-medium text-sm">{editState.question}</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-vote">Vote</Label>
+                <Select
+                  value={editState.vote}
+                  onValueChange={(value: "YES" | "NO") => setEditState({ ...editState, vote: value })}
+                >
+                  <SelectTrigger id="edit-vote">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="YES">YES</SelectItem>
+                    <SelectItem value="NO">NO</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-guess">Guess (number of YES votes)</Label>
+                <Input
+                  id="edit-guess"
+                  type="number"
+                  min={0}
+                  value={editState.guess}
+                  onChange={(e) => setEditState({ ...editState, guess: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditState(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={editMutation.isPending}>
+              {editMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -643,6 +643,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/admin/sessions/:sessionId/participants/:participantId/submission', requireAdmin, async (req, res) => {
+    try {
+      const { sessionId, participantId } = req.params;
+      const { vote, guessYesCount } = req.body;
+
+      if (!vote || !['YES', 'NO'].includes(vote)) {
+        res.status(400).json({ error: 'vote must be "YES" or "NO"' });
+        return;
+      }
+      if (typeof guessYesCount !== 'number' || !Number.isInteger(guessYesCount) || guessYesCount < 0) {
+        res.status(400).json({ error: 'guessYesCount must be a non-negative integer' });
+        return;
+      }
+
+      const session = await storage.getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Session not found' });
+        return;
+      }
+      if (session.status !== 'closed') {
+        res.status(400).json({ error: 'Can only edit submissions for closed sessions' });
+        return;
+      }
+
+      const existing = await storage.getSubmission(sessionId, participantId);
+      if (!existing) {
+        res.status(404).json({ error: 'Submission not found' });
+        return;
+      }
+
+      await storage.upsertSubmission({
+        sessionId,
+        participantId,
+        vote: vote as 'YES' | 'NO',
+        guessYesCount
+      });
+
+      await storage.recalculateSessionPoints(sessionId);
+
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update submission' });
+    }
+  });
+
   app.get('/api/admin/games/:gameId/export', requireAdmin, async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);

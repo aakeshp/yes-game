@@ -37,6 +37,7 @@ export interface IStorage {
   
   // Complex operations
   calculateAndStoreSessionResults(sessionId: string): Promise<SessionResults>;
+  recalculateSessionPoints(sessionId: string): Promise<void>;
   getParticipantLeaderboardForGame(gameId: string): Promise<Array<{ participantId: string; displayName: string; totalPoints: number; sessionsPlayed: number }>>;
 }
 
@@ -285,6 +286,20 @@ export class MemStorage implements IStorage {
     }
 
     return results;
+  }
+
+  async recalculateSessionPoints(sessionId: string): Promise<void> {
+    const submissions = await this.getSubmissionsBySessionId(sessionId);
+    const yesCount = submissions.filter(s => s.vote === "YES").length;
+    for (const submission of submissions) {
+      let points = 0;
+      if (submission.vote && submission.guessYesCount !== null && submission.guessYesCount !== undefined) {
+        const error = Math.abs(submission.guessYesCount - yesCount);
+        if (error === 0) points = 5;
+        else if (error === 1) points = 3;
+      }
+      await this.upsertSessionPoints(sessionId, submission.participantId, points);
+    }
   }
 
   async getParticipantLeaderboardForGame(gameId: string): Promise<Array<{ participantId: string; displayName: string; totalPoints: number; sessionsPlayed: number }>> {
@@ -599,6 +614,15 @@ export class DatabaseStorage implements IStorage {
 
       return results;
     });
+  }
+
+  async recalculateSessionPoints(sessionId: string): Promise<void> {
+    const sessionSubmissions = await this.getSubmissionsBySessionId(sessionId);
+    const yesVotes = sessionSubmissions.filter(s => s.vote === 'YES').length;
+    for (const submission of sessionSubmissions) {
+      const points = this.calculatePoints(submission.guessYesCount, yesVotes);
+      await this.upsertSessionPoints(sessionId, submission.participantId, points);
+    }
   }
 
   private async getStoredSessionResults(sessionId: string): Promise<SessionResults> {
