@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "0ZYAdZ-T_KHtcNuQjsXub"
+uri = "file://attached_assets/generated_images/strike_animation_mockup.png"
+type = "image"
+title = "strike celebration bowling"
+
+[[generated]]
+id = "Uf-BQ0hUz5drUO1XgD7q3"
+uri = "file://attached_assets/generated_images/spare_animation_mockup.png"
+type = "image"
+title = "spare close celebration bowling"
