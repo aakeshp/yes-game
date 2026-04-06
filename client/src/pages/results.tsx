@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Users } from "lucide-react";
+import CelebrationOverlay from "@/components/CelebrationOverlay";
 
 interface SessionResults {
   sessionId: string;
@@ -31,10 +32,15 @@ interface SessionWithResults {
   results?: SessionResults;
 }
 
+const THEMES = ["psychic", "gameshow", "fireworks"] as const;
+
 export default function Results() {
   const [location, navigate] = useLocation();
   const [sessionId, setSessionId] = useState<string>("");
   const queryClient = useQueryClient();
+  const celebrationShown = useRef(false);
+  const [celebrationType, setCelebrationType] = useState<"perfect" | "close" | null>(null);
+  const [celebrationTheme, setCelebrationTheme] = useState<"psychic" | "gameshow" | "fireworks">("psychic");
 
   // Extract session ID from URL
   useEffect(() => {
@@ -88,6 +94,34 @@ export default function Results() {
     }
     navigate("/");
   };
+
+  // Trigger celebration overlay once when results first arrive
+  useEffect(() => {
+    if (!session?.results || celebrationShown.current) return;
+    celebrationShown.current = true;
+
+    const participantId = localStorage.getItem("participantId");
+    if (!participantId) return;
+
+    const myEntry = session.results.participants.find(
+      (p) => p.participantId === participantId
+    );
+    if (!myEntry) return;
+
+    const type: "perfect" | "close" | null =
+      myEntry.points === 5 ? "perfect" :
+      myEntry.points === 3 ? "close" : null;
+
+    if (!type) return;
+
+    const rawIndex = parseInt(localStorage.getItem("celebrationThemeIndex") || "0", 10);
+    const themeIndex = isNaN(rawIndex) ? 0 : rawIndex % 3;
+    const theme = THEMES[themeIndex];
+    localStorage.setItem("celebrationThemeIndex", String((themeIndex + 1) % 3));
+
+    setCelebrationType(type);
+    setCelebrationTheme(theme);
+  }, [session?.results]);
 
   if (isLoading) {
     return (
@@ -144,6 +178,8 @@ export default function Results() {
   const closeGuessers = results.participants.filter(p => p.points === 3);
 
   return (
+    <>
+      <CelebrationOverlay type={celebrationType} theme={celebrationTheme} />
     <div className="min-h-screen bg-background">
       {/* Navigation Header */}
       <header className="bg-card border-b border-border shadow-sm">
@@ -302,5 +338,6 @@ export default function Results() {
         </Card>
       </div>
     </div>
+    </>
   );
 }
