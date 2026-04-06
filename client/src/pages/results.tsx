@@ -100,7 +100,18 @@ export default function Results() {
     if (!session?.results || celebrationShown.current) return;
     celebrationShown.current = true;
 
-    const participantId = localStorage.getItem("participantId");
+    const participantIds = new Set(session.results.participants.map(p => p.participantId));
+    let participantId: string | null = null;
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("participantId_")) {
+        const val = localStorage.getItem(key);
+        if (val && participantIds.has(val)) {
+          participantId = val;
+          break;
+        }
+      }
+    }
     if (!participantId) return;
 
     const myEntry = session.results.participants.find(
