@@ -21,8 +21,8 @@
   --accent-foreground: hsl(0, 0%, 13.33%);
   --destructive: hsl(345, 69.57%, 90.98%);
   --destructive-foreground: hsl(0, 0%, 13.33%);
-  --border: hsl(0, 0%, 100%);
-  --input: hsl(0, 0%, 100%);
+  --border: hsl(0, 0%, 82%);
+  --input: hsl(0, 0%, 75%);
   --ring: hsl(50.82, 100%, 66.67%);
   --chart-1: hsl(313.85, 37.14%, 79.41%);
   --chart-2: hsl(50.82, 100%, 66.67%);
@@ -188,5 +188,23 @@
   @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.8; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+
+    .voting-button:hover {
+      transform: none;
+    }
+
+    .status-live {
+      animation: none;
+    }
   }
 }

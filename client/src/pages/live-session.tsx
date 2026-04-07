@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,12 +43,33 @@ export default function LiveSession() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [hasChangedSinceSubmit, setHasChangedSinceSubmit] = useState(false);
+  const [timerAnnouncement, setTimerAnnouncement] = useState("");
+  const announcedTimes = useRef<Set<number>>(new Set());
 
   // Check if current user is an admin
   const { data: adminUser } = useQuery<{isAdmin: boolean, name: string, email: string}>({
     queryKey: ["/api/admin/me"],
     retry: false,
   });
+
+  // Set page title
+  useEffect(() => {
+    document.title = "Live Session – Yes Game";
+  }, []);
+
+  // Timer announcements for screen readers
+  useEffect(() => {
+    if (timeRemaining === 30 && !announcedTimes.current.has(30)) {
+      announcedTimes.current.add(30);
+      setTimerAnnouncement("30 seconds remaining");
+    } else if (timeRemaining === 10 && !announcedTimes.current.has(10)) {
+      announcedTimes.current.add(10);
+      setTimerAnnouncement("10 seconds remaining");
+    } else if (timeRemaining === 0 && !announcedTimes.current.has(0)) {
+      announcedTimes.current.add(0);
+      setTimerAnnouncement("Time is up");
+    }
+  }, [timeRemaining]);
 
   // Extract session ID from URL
   useEffect(() => {
@@ -210,14 +231,14 @@ export default function LiveSession() {
         </div>
       </header>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Player Info Bar */}
         <Card className="shadow-lg border border-border mb-6">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 bg-secondary rounded-full"></div>
+                  <div className="w-3 h-3 bg-secondary rounded-full" aria-hidden="true"></div>
                   <span className="font-medium text-foreground">
                     You are playing as: <span className="text-primary" data-testid="text-player-name">{participant.displayName}</span>
                   </span>
@@ -231,7 +252,7 @@ export default function LiveSession() {
                     onClick={() => navigate(`/admin/sessions/${sessionId}`)}
                     data-testid="button-switch-admin"
                   >
-                    <Settings className="w-4 h-4 mr-2" />
+                    <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
                     Switch to Admin View
                   </Button>
                 )}
@@ -253,12 +274,24 @@ export default function LiveSession() {
               
               {/* Timer Display */}
               <div className="mb-8">
-                <div className="inline-flex items-center justify-center w-32 h-32 bg-primary rounded-full mb-4">
-                  <span className="text-4xl font-bold text-primary-foreground font-mono" data-testid="text-timer">
+                <div
+                  className="inline-flex items-center justify-center w-32 h-32 bg-primary rounded-full mb-4"
+                  role="timer"
+                  aria-label={`${timeRemaining} seconds remaining`}
+                >
+                  <span className="text-4xl font-bold text-primary-foreground font-mono" data-testid="text-timer" aria-hidden="true">
                     {formatTime(timeRemaining)}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">Time remaining</p>
+                {/* Screen-reader-only live announcements at key intervals */}
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="sr-only"
+                >
+                  {timerAnnouncement}
+                </div>
               </div>
 
               {/* Voting Buttons */}
@@ -274,7 +307,7 @@ export default function LiveSession() {
                   data-testid="button-vote-yes"
                 >
                   <div className="flex flex-col items-center space-y-2">
-                    <ThumbsUp size={48} />
+                    <ThumbsUp size={48} aria-hidden="true" />
                     <div>YES</div>
                     <div className="text-sm font-normal opacity-80">Click to vote yes</div>
                   </div>
@@ -290,7 +323,7 @@ export default function LiveSession() {
                   data-testid="button-vote-no"
                 >
                   <div className="flex flex-col items-center space-y-2">
-                    <ThumbsDown size={48} />
+                    <ThumbsDown size={48} aria-hidden="true" />
                     <div>NO</div>
                     <div className="text-sm font-normal opacity-80">Click to vote no</div>
                   </div>
@@ -375,7 +408,7 @@ export default function LiveSession() {
             </CardContent>
           </Card>
         )}
-      </div>
+      </main>
     </div>
   );
 }

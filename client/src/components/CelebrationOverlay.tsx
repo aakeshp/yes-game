@@ -140,6 +140,9 @@ function GameShowSpotlight() {
 export default function CelebrationOverlay({ type, theme }: CelebrationOverlayProps) {
   const [visible, setVisible] = useState(true);
   const confettiFired = useRef(false);
+  const prefersReducedMotion = typeof window !== "undefined"
+    ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    : false;
 
   const config = THEME_CONFIG[theme];
   const content = type === "perfect" ? config.perfect : config.close;
@@ -151,7 +154,7 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
 
     let fireworksInterval: ReturnType<typeof setInterval> | null = null;
 
-    if (theme === "fireworks") {
+    if (!prefersReducedMotion && theme === "fireworks") {
       const duration = intense ? 2200 : 1200;
       const end = Date.now() + duration;
       const colors = ["#60a5fa", "#818cf8", "#c4b5fd", "#38bdf8", "#facc15"];
@@ -178,7 +181,7 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
           startVelocity: intense ? 45 : 30,
         });
       }, 250);
-    } else if (theme === "gameshow") {
+    } else if (!prefersReducedMotion && theme === "gameshow") {
       confetti({
         particleCount: intense ? 180 : 80,
         spread: intense ? 100 : 70,
@@ -199,6 +202,8 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
 
   if (!type) return null;
 
+  const motionDuration = prefersReducedMotion ? 0 : 0.35;
+
   return (
     <AnimatePresence>
       {visible && (
@@ -208,18 +213,26 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.35 }}
+          transition={{ duration: motionDuration }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={content.headline}
           onClick={() => setVisible(false)}
         >
           {theme === "psychic" && <PsychicStars intense={intense} />}
           {theme === "gameshow" && <GameShowSpotlight />}
 
+          {/* SR announcement so screen readers hear the overlay immediately */}
+          <div role="status" aria-live="polite" className="sr-only">
+            {content.headline}. {content.subtitle}
+          </div>
+
           <div className="relative z-10 flex flex-col items-center gap-6 px-8 text-center select-none">
             <motion.div
               className="text-8xl"
               initial={{ scale: 0, rotate: -20 }}
-              animate={{ scale: [0, 1.3, 1], rotate: [0, 15, 0] }}
-              transition={{ duration: 0.6, ease: "easeOut" }}
+              animate={prefersReducedMotion ? {} : { scale: [0, 1.3, 1], rotate: [0, 15, 0] }}
+              transition={{ duration: prefersReducedMotion ? 0 : 0.6, ease: "easeOut" }}
             >
               {content.emoji}
             </motion.div>
@@ -236,23 +249,23 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
                     ? "0 0 40px rgba(253,224,71,0.9)"
                     : "0 0 40px rgba(147,197,253,0.9)",
               }}
-              initial={{ y: 40, opacity: 0 }}
+              initial={{ y: prefersReducedMotion ? 0 : 40, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.25, duration: 0.5, ease: "easeOut" }}
+              transition={{ delay: prefersReducedMotion ? 0 : 0.25, duration: prefersReducedMotion ? 0 : 0.5, ease: "easeOut" }}
             >
               {content.headline}
             </motion.h1>
 
             <motion.p
               className={`text-lg sm:text-xl font-medium ${config.accentColor}`}
-              initial={{ y: 20, opacity: 0 }}
+              initial={{ y: prefersReducedMotion ? 0 : 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.45, duration: 0.4 }}
+              transition={{ delay: prefersReducedMotion ? 0 : 0.45, duration: prefersReducedMotion ? 0 : 0.4 }}
             >
               {content.sub}
             </motion.p>
 
-            {intense && (
+            {intense && !prefersReducedMotion && (
               <motion.div
                 className={`flex gap-1 ${config.accentColor}`}
                 initial={{ opacity: 0 }}

@@ -42,6 +42,11 @@ export default function Results() {
   const [celebrationType, setCelebrationType] = useState<"perfect" | "close" | null>(null);
   const [celebrationTheme, setCelebrationTheme] = useState<"psychic" | "gameshow" | "fireworks">("psychic");
 
+  // Set page title
+  useEffect(() => {
+    document.title = "Session Results – Yes Game";
+  }, []);
+
   // Extract session ID from URL
   useEffect(() => {
     const match = location.match(/\/results\/(.+)/);
@@ -209,7 +214,7 @@ export default function Results() {
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Results Header */}
         <Card className="shadow-lg border border-border mb-6">
           <CardContent className="p-8">
@@ -241,7 +246,7 @@ export default function Results() {
               {winners.length > 0 && (
                 <div className="bg-gradient-to-r from-accent to-accent/80 rounded-lg p-6 mb-6 text-accent-foreground">
                   <div className="flex items-center justify-center space-x-2 mb-4">
-                    <Trophy className="w-6 h-6" />
+                    <Trophy className="w-6 h-6" aria-hidden="true" />
                     <h3 className="text-xl font-bold">Winners (Exact Guess)</h3>
                   </div>
                   <div className="flex flex-wrap justify-center gap-4">
@@ -278,7 +283,7 @@ export default function Results() {
         <Card className="shadow-lg border border-border overflow-hidden mb-6">
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Users className="w-5 h-5" />
+              <Users className="w-5 h-5" aria-hidden="true" />
               <span>All Participants</span>
             </CardTitle>
           </CardHeader>
@@ -287,16 +292,16 @@ export default function Results() {
               <table className="w-full">
                 <thead className="bg-muted">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Name
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Vote
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Guess
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                       Points
                     </th>
                   </tr>
@@ -305,15 +310,9 @@ export default function Results() {
                   {results.participants.map((participant) => (
                     <tr key={participant.participantId} className="hover:bg-muted/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className={`w-2 h-2 rounded-full mr-3 ${
-                            participant.vote === "YES" ? "bg-secondary" : 
-                            participant.vote === "NO" ? "bg-destructive" : "bg-muted-foreground"
-                          }`}></div>
-                          <span className="font-medium text-foreground" data-testid={`participant-name-${participant.participantId}`}>
-                            {participant.displayName}
-                          </span>
-                        </div>
+                        <span className="font-medium text-foreground" data-testid={`participant-name-${participant.participantId}`}>
+                          {participant.displayName}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {participant.vote ? (
@@ -347,7 +346,7 @@ export default function Results() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
     </>
   );

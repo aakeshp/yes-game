@@ -51,6 +51,11 @@ export default function GameLobby() {
   });
   const { socket } = useWebSocket();
 
+  // Set page title
+  useEffect(() => {
+    document.title = "Game Lobby – Yes Game";
+  }, []);
+
   // Load saved data from localStorage
   useEffect(() => {
     const savedName = localStorage.getItem("playerName");
@@ -291,7 +296,7 @@ export default function GameLobby() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Card className="shadow-lg border border-border">
           <CardContent className="p-8">
             <div className="text-center mb-8">
@@ -373,29 +378,29 @@ export default function GameLobby() {
             {/* Overall Leaderboard */}
             {hasJoinedGame && (
               <div className="mt-8 border-t border-border pt-8">
-                <div 
-                  className="flex items-center justify-between mb-4 cursor-pointer group"
-                  onClick={toggleLeaderboard}
-                  data-testid="button-toggle-leaderboard"
-                >
+                <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                    <span className="text-2xl">🏆</span> Overall Leaderboard
+                    <span aria-hidden="true">🏆</span> Overall Leaderboard
                   </h3>
                   <Button 
                     variant="ghost" 
                     size="sm"
-                    className="group-hover:bg-muted"
+                    onClick={toggleLeaderboard}
+                    aria-expanded={!isLeaderboardCollapsed}
+                    aria-controls="leaderboard-panel"
+                    aria-label={isLeaderboardCollapsed ? "Expand leaderboard" : "Collapse leaderboard"}
+                    data-testid="button-toggle-leaderboard"
                   >
                     {isLeaderboardCollapsed ? (
-                      <ChevronDown className="h-5 w-5" />
+                      <ChevronDown className="h-5 w-5" aria-hidden="true" />
                     ) : (
-                      <ChevronUp className="h-5 w-5" />
+                      <ChevronUp className="h-5 w-5" aria-hidden="true" />
                     )}
                   </Button>
                 </div>
                 
                 {!isLeaderboardCollapsed && (
-                  <>
+                  <div id="leaderboard-panel">
                     {leaderboardLoading && (
                       <div className="bg-muted/50 rounded-lg border border-border p-8 text-center">
                         <p className="text-muted-foreground">Loading leaderboard...</p>
@@ -417,11 +422,11 @@ export default function GameLobby() {
                               >
                                 <div className="flex items-center gap-4 flex-1">
                                   <div className="flex items-center justify-center w-8 h-8">
-                                    {rank === 1 && <span className="text-2xl">🥇</span>}
-                                    {rank === 2 && <span className="text-2xl">🥈</span>}
-                                    {rank === 3 && <span className="text-2xl">🥉</span>}
+                                    {rank === 1 && <span role="img" aria-label="1st place" className="text-2xl">🥇</span>}
+                                    {rank === 2 && <span role="img" aria-label="2nd place" className="text-2xl">🥈</span>}
+                                    {rank === 3 && <span role="img" aria-label="3rd place" className="text-2xl">🥉</span>}
                                     {rank > 3 && (
-                                      <span className="text-sm font-semibold text-muted-foreground">
+                                      <span className="text-sm font-semibold text-muted-foreground" aria-label={`Rank ${rank}`}>
                                         #{rank}
                                       </span>
                                     )}
@@ -470,7 +475,7 @@ export default function GameLobby() {
                         </p>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             )}
@@ -525,7 +530,7 @@ export default function GameLobby() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }
