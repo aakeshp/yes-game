@@ -36,6 +36,10 @@ export default function AdminLiveView() {
   const [participantCount, setParticipantCount] = useState<number>(0);
   const [submissionCount, setSubmissionCount] = useState<number>(0);
 
+  useEffect(() => {
+    document.title = "Live Session View – Yes Game";
+  }, []);
+
   // Extract session ID from URL
   useEffect(() => {
     const match = location.match(/\/admin\/sessions\/(.+)/);

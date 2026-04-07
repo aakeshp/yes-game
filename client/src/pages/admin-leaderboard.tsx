@@ -50,6 +50,10 @@ export default function AdminLeaderboard() {
   const { toast } = useToast();
 
   useEffect(() => {
+    document.title = "Leaderboard – Yes Game";
+  }, []);
+
+  useEffect(() => {
     const match = location.match(/\/admin\/games\/(.+)\/leaderboard/);
     if (match) {
       setGameId(match[1]);

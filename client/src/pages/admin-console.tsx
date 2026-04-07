@@ -53,6 +53,10 @@ export default function AdminConsole() {
   });
 
   useEffect(() => {
+    document.title = "Admin Console – Yes Game";
+  }, []);
+
+  useEffect(() => {
     if (!authLoading && !adminUser?.isAdmin) {
       toast({ title: "Authentication Required", description: "Please sign in to access the admin console", variant: "destructive" });
       navigate("/admin");

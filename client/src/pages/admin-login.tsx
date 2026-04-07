@@ -22,6 +22,10 @@ export default function AdminLogin() {
     window.location.search.includes('error=access_denied');
 
   useEffect(() => {
+    document.title = "Admin Login – Yes Game";
+  }, []);
+
+  useEffect(() => {
     if (adminUser?.isAdmin) {
       // User is already authenticated, redirect to admin console
       navigate("/admin/console");

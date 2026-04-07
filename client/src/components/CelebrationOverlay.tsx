@@ -219,12 +219,12 @@ export default function CelebrationOverlay({ type, theme }: CelebrationOverlayPr
           aria-label={content.headline}
           onClick={() => setVisible(false)}
         >
-          {theme === "psychic" && <PsychicStars intense={intense} />}
-          {theme === "gameshow" && <GameShowSpotlight />}
+          {!prefersReducedMotion && theme === "psychic" && <PsychicStars intense={intense} />}
+          {!prefersReducedMotion && theme === "gameshow" && <GameShowSpotlight />}
 
           {/* SR announcement so screen readers hear the overlay immediately */}
           <div role="status" aria-live="polite" className="sr-only">
-            {content.headline}. {content.subtitle}
+            {content.headline}. {content.sub}
           </div>
 
           <div className="relative z-10 flex flex-col items-center gap-6 px-8 text-center select-none">

@@ -1,7 +1,12 @@
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
 export default function AdminLoginFailed() {
+  useEffect(() => {
+    document.title = "Access Denied – Yes Game";
+  }, []);
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <Card className="w-full max-w-md">

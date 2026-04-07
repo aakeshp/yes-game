@@ -197,10 +197,12 @@
       animation-duration: 0.01ms !important;
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      transition-delay: 0ms !important;
     }
 
-    .voting-button:hover {
-      transform: none;
+    /* Disable Tailwind hover:scale-* on all elements */
+    *:hover {
+      transform: none !important;
     }
 
     .status-live {
