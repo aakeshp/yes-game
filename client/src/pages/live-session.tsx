@@ -310,7 +310,7 @@ export default function LiveSession() {
                     placeholder="Enter your guess"
                     value={guess}
                     onChange={(e) => {
-                      const newValue = e.target.value;
+                      const newValue = e.target.value.replace(/\s/g, "");
                       setGuess(newValue);
                       if (hasSubmitted) {
                         setHasChangedSinceSubmit(true);
