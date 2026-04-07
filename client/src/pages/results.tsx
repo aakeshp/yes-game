@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,7 +38,6 @@ export default function Results() {
   const [location, navigate] = useLocation();
   const [sessionId, setSessionId] = useState<string>("");
   const queryClient = useQueryClient();
-  const celebrationShown = useRef(false);
   const [celebrationType, setCelebrationType] = useState<"perfect" | "close" | null>(null);
   const [celebrationTheme, setCelebrationTheme] = useState<"psychic" | "gameshow" | "fireworks">("psychic");
 
@@ -100,10 +99,12 @@ export default function Results() {
     navigate("/");
   };
 
-  // Trigger celebration overlay once when results first arrive
+  // Trigger celebration overlay once per session (persisted in localStorage)
   useEffect(() => {
-    if (!session?.results || celebrationShown.current) return;
-    celebrationShown.current = true;
+    if (!session?.results || !sessionId) return;
+    const seenKey = `celebrationSeen_${sessionId}`;
+    if (localStorage.getItem(seenKey)) return;
+    localStorage.setItem(seenKey, "1");
 
     const participantIds = new Set(session.results.participants.map(p => p.participantId));
     let participantId: string | null = null;
@@ -137,7 +138,7 @@ export default function Results() {
 
     setCelebrationType(type);
     setCelebrationTheme(theme);
-  }, [session?.results]);
+  }, [session?.results, sessionId]);
 
   if (isLoading) {
     return (
