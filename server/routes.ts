@@ -12,6 +12,7 @@ interface WebSocketConnection {
   participantId?: string;
   isAdmin?: boolean;
   playerUser: PlayerUser | null;
+  wsSessionId?: string; // HTTP session ID at WS connect time — used to invalidate on logout
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -55,7 +56,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const sessionMiddleware = app.locals.sessionMiddleware;
     sessionMiddleware(req as any, {} as any, () => {
       const playerUser: PlayerUser | null = (req as any).session?.playerUser ?? null;
-      connections.set(ws, { ws, playerUser });
+      const wsSessionId: string | undefined = (req as any).sessionID;
+      connections.set(ws, { ws, playerUser, wsSessionId });
 
       // Send connection confirmation
       ws.send(JSON.stringify({ type: 'connection:ready' }));
@@ -412,9 +414,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post('/api/player/logout', (req: any, res: any) => {
+    const sessionId = req.sessionID;
     delete req.session.playerUser;
     req.session.save((err: any) => {
       if (err) console.error('Session save error:', err);
+      // Immediately null out playerUser on any active WS connections from this session
+      // so in-flight submit messages are rejected even before the socket closes
+      for (const connection of connections.values()) {
+        if (connection.wsSessionId === sessionId) {
+          connection.playerUser = null;
+        }
+      }
       res.json({ success: true });
     });
   });
@@ -425,17 +435,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const items = req.body;
     if (!Array.isArray(items)) {
-      return res.status(400).json({ error: 'Request body must be an array of { participantId, gameId }' });
+      return res.status(400).json({ error: 'Request body must be an array of { participantId, gameCode }' });
     }
     const playerUserId = req.session.playerUser.id;
     let claimed = 0;
     for (const item of items) {
-      if (!item?.participantId || !item?.gameId) continue;
+      if (!item?.participantId || !item?.gameCode) continue;
       try {
         const participant = await storage.getParticipant(item.participantId);
         if (!participant) continue;
-        // Verify participant belongs to the game the client claims
-        if (participant.gameId !== item.gameId) continue;
+        // Verify participant belongs to the game identified by this code
+        const game = await storage.getGameByCode(item.gameCode);
+        if (!game || participant.gameId !== game.id) continue;
         // Only link unclaimed participants
         if (participant.playerUserId !== null) continue;
         const linked = await storage.linkParticipantToPlayer(item.participantId, playerUserId);

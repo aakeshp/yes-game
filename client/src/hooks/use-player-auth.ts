@@ -24,7 +24,7 @@ export function usePlayerAuth() {
     },
   });
 
-  const claimParticipants = async (items: { participantId: string; gameId: string }[]) => {
+  const claimParticipants = async (items: { participantId: string; gameCode: string }[]) => {
     if (!playerUser || items.length === 0) return;
     try {
       await apiRequest("POST", "/api/player/claim-participants", items);

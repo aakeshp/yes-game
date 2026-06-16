@@ -52,7 +52,7 @@ export default function GameLobby() {
     const saved = localStorage.getItem("showAllLeaderboard");
     return saved === "true";
   });
-  const { socket } = useWebSocket();
+  const { socket, disconnect } = useWebSocket();
 
   useEffect(() => {
     document.title = "Game Lobby – Yes Game";
@@ -86,14 +86,13 @@ export default function GameLobby() {
     // Claim any existing anonymous participants (one-time per session)
     if (!claimedThisSession) {
       setClaimedThisSession(true);
-      const items: { participantId: string; gameId: string }[] = [];
+      const items: { participantId: string; gameCode: string }[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key?.startsWith("participantId_")) {
           const gameCode = key.replace("participantId_", "");
           const participantId = localStorage.getItem(key);
-          const gameId = localStorage.getItem(`gameId_${gameCode}`);
-          if (participantId && gameId) items.push({ participantId, gameId });
+          if (participantId && gameCode) items.push({ participantId, gameCode });
         }
       }
       if (items.length > 0) {
@@ -313,7 +312,7 @@ export default function GameLobby() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={logout}
+                    onClick={() => { disconnect(); logout(); }}
                     disabled={isLoggingOut}
                     data-testid="button-player-logout"
                   >
