@@ -54,7 +54,7 @@ export default function GameLobby() {
   });
 
   const playAsAdminMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/player/login-as-admin"),
+    mutationFn: () => apiRequest("POST", "/api/player/login-as-admin").then(r => r.json()),
     onSuccess: (data: any) => {
       queryClient.setQueryData(["/api/player/me"], data);
       if (!localStorage.getItem("playerName")) {
