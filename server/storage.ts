@@ -291,6 +291,7 @@ export class MemStorage implements IStorage {
 
       results.participants.push({
         participantId: submission.participantId,
+        playerUserId: participant.playerUserId ?? null,
         displayName: participant.displayName,
         vote: submission.vote,
         guess: submission.guessYesCount,
@@ -681,6 +682,7 @@ export class DatabaseStorage implements IStorage {
 
         participants.push({
           participantId: submission.participantId,
+          playerUserId: participant.playerUserId ?? null,
           displayName: participant.displayName,
           vote: submission.vote,
           guess: submission.guessYesCount,
@@ -742,6 +744,7 @@ export class DatabaseStorage implements IStorage {
 
       participants.push({
         participantId: submission.participantId,
+        playerUserId: participant.playerUserId ?? null,
         displayName: participant.displayName,
         vote: submission.vote,
         guess: submission.guessYesCount,

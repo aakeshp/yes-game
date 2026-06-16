@@ -694,6 +694,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (sessionsPlayed > 0) {
           leaderboard.push({
             participantId: participant.id,
+            playerUserId: participant.playerUserId ?? null,
             displayName: participant.displayName,
             totalPoints,
             sessionsPlayed

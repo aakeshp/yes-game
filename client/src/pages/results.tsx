@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Users } from "lucide-react";
 import CelebrationOverlay from "@/components/CelebrationOverlay";
+import { usePlayerAuth } from "@/hooks/use-player-auth";
 
 interface SessionResults {
   sessionId: string;
@@ -14,6 +15,7 @@ interface SessionResults {
   noCount: number;
   participants: Array<{
     participantId: string;
+    playerUserId?: string | null;
     displayName: string;
     vote: "YES" | "NO" | null;
     guess: number | null;
@@ -38,6 +40,7 @@ export default function Results() {
   const [location, navigate] = useLocation();
   const [sessionId, setSessionId] = useState<string>("");
   const queryClient = useQueryClient();
+  const { playerUser } = usePlayerAuth();
   const [celebrationType, setCelebrationType] = useState<"perfect" | "close" | null>(null);
   const [celebrationTheme, setCelebrationTheme] = useState<"psychic" | "gameshow" | "fireworks">("psychic");
 
@@ -197,6 +200,9 @@ export default function Results() {
   // Identify the current player's row for highlighting
   const myGameCode = localStorage.getItem("currentGameCode");
   const myParticipantId = myGameCode ? localStorage.getItem(`participantId_${myGameCode}`) : null;
+  const isMyRow = (participant: { participantId: string; playerUserId?: string | null }) =>
+    (!!playerUser && !!participant.playerUserId && participant.playerUserId === playerUser.id) ||
+    (!!myParticipantId && participant.participantId === myParticipantId);
 
   return (
     <>
@@ -313,7 +319,7 @@ export default function Results() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {results.participants.map((participant) => {
-                    const isMe = !!myParticipantId && participant.participantId === myParticipantId;
+                    const isMe = isMyRow(participant);
                     return (
                     <tr key={participant.participantId} className={`transition-colors ${isMe ? 'bg-primary/10 border-l-4 border-primary hover:bg-primary/15' : 'hover:bg-muted/50'}`}>
                       <td className="px-6 py-4 whitespace-nowrap">

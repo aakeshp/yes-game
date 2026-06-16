@@ -168,6 +168,7 @@ export type SessionResults = {
   noCount: number;
   participants: Array<{
     participantId: string;
+    playerUserId?: string | null;
     displayName: string;
     vote: "YES" | "NO" | null;
     guess: number | null;

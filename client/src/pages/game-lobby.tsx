@@ -29,6 +29,7 @@ interface Game {
 
 interface LeaderboardEntry {
   participantId: string;
+  playerUserId?: string | null;
   displayName: string;
   totalPoints: number;
   sessionsPlayed: number;
@@ -597,7 +598,9 @@ export default function GameLobby() {
                               return calculateRanks(leaderboardData.leaderboard)
                                 .slice(0, showAllLeaderboard ? leaderboardData.leaderboard.length : 10)
                                 .map(({ entry, rank }, index) => {
-                                  const isMe = !!myParticipantId && entry.participantId === myParticipantId;
+                                  const isMe =
+                                    (!!playerUser && !!entry.playerUserId && entry.playerUserId === playerUser.id) ||
+                                    (!!myParticipantId && entry.participantId === myParticipantId);
                                   return (
                                     <div
                                       key={entry.participantId}
