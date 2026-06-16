@@ -231,12 +231,15 @@ export default function AdminConsole() {
       const response = await apiRequest("POST", "/api/admin/logout", {});
       return response.json();
     },
+    onMutate: () => {
+      queryClient.setQueryData(["/api/admin/me"], null);
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
       toast({ title: "Success", description: "Logged out successfully" });
       navigate("/");
     },
     onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
       toast({ title: "Error", description: "Logout failed", variant: "destructive" });
     }
   });
