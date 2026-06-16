@@ -405,9 +405,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Player API routes
-  app.get('/api/player/me', (req: any, res: any) => {
+  app.get('/api/player/me', async (req: any, res: any) => {
     if (req.session?.playerUser) {
-      res.json(req.session.playerUser);
+      const playerUser = req.session.playerUser;
+      const adminEmails = process.env.ADMIN_EMAILS?.split(',').map((e: string) => e.trim()) || [];
+      const isFullAdmin = adminEmails.includes(playerUser.email);
+      const isGameAdmin = !isFullAdmin && (await storage.getGamesByAdminEmail(playerUser.email)).length > 0;
+      res.json({ ...playerUser, isAdmin: isFullAdmin || isGameAdmin });
     } else {
       res.status(401).json({ error: 'Not logged in as player' });
     }

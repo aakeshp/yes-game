@@ -371,10 +371,10 @@ export default function GameLobby() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => navigate(adminUser ? "/admin/console" : "/admin")}
+                onClick={() => navigate((adminUser || playerUser?.isAdmin) ? "/admin/console" : "/admin")}
                 data-testid="button-settings"
               >
-                {adminUser ? "Admin Console" : "Admin Login"}
+                {(adminUser || playerUser?.isAdmin) ? "Admin Console" : "Admin Login"}
               </Button>
             </div>
           </div>
