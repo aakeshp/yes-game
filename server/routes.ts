@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertGameSchema, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema } from "@shared/schema";
+import { insertGameSchema, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertGameAdminSchema } from "@shared/schema";
 import { z } from "zod";
 import passport from "passport";
 
@@ -23,6 +23,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Get the admin middleware from app.locals
   const requireAdmin = app.locals.requireAdmin;
+  const requireFullAdmin = app.locals.requireFullAdmin;
+
+  function makeGameAccessMiddleware(getGameId: (req: any) => string | Promise<string>) {
+    return async (req: any, res: any, next: any) => {
+      if (!req.user?.isAdmin) {
+        return res.status(401).json({ error: 'Admin access required' });
+      }
+      if (req.user.isFullAdmin) {
+        return next();
+      }
+      try {
+        const gameId = await getGameId(req);
+        if (!gameId) {
+          return res.status(404).json({ error: 'Resource not found' });
+        }
+        const allowed = await storage.isGameAdmin(gameId, req.user.email);
+        if (allowed) return next();
+        return res.status(403).json({ error: 'No access to this game' });
+      } catch (err) {
+        return res.status(500).json({ error: 'Access check failed' });
+      }
+    };
+  }
 
   // WebSocket connection handler
   wss.on('connection', (ws, req) => {
@@ -345,7 +368,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         email: req.user.email,
         name: req.user.name,
-        isAdmin: true
+        isAdmin: true,
+        isFullAdmin: req.user.isFullAdmin === true
       });
     } else {
       res.status(401).json({ error: 'Not authenticated' });
@@ -371,10 +395,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
-  app.get('/api/admin/games', requireAdmin, async (req, res) => {
+  app.get('/api/admin/games', requireAdmin, async (req: any, res) => {
     try {
-      // In a real app, you'd filter by admin ID
-      const games = await storage.getAllGames();
+      let games;
+      if (req.user.isFullAdmin) {
+        games = await storage.getAllGames();
+      } else {
+        games = await storage.getGamesByAdminEmail(req.user.email);
+      }
       res.json(games);
     } catch (error) {
       console.error('Error fetching admin games:', error);
@@ -382,8 +410,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Game Admin management (full admins only)
+  app.get('/api/admin/games/:gameId/admins', requireFullAdmin, async (req: any, res) => {
+    try {
+      const admins = await storage.getGameAdminsByGameId(req.params.gameId);
+      res.json(admins);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch game admins' });
+    }
+  });
+
+  app.post('/api/admin/games/:gameId/admins', requireFullAdmin, async (req: any, res) => {
+    try {
+      const parsed = insertGameAdminSchema.parse({
+        gameId: req.params.gameId,
+        email: req.body.email,
+        invitedByEmail: req.user.email
+      });
+      const ga = await storage.createGameAdmin(parsed);
+      res.json(ga);
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        res.status(409).json({ error: 'This email is already a game admin' });
+      } else {
+        res.status(400).json({ error: error?.message || 'Invalid request' });
+      }
+    }
+  });
+
+  app.delete('/api/admin/games/:gameId/admins/:email', requireFullAdmin, async (req: any, res) => {
+    try {
+      const email = decodeURIComponent(req.params.email);
+      await storage.deleteGameAdmin(req.params.gameId, email);
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to remove game admin' });
+    }
+  });
+
   // Games
-  app.post('/api/games', async (req, res) => {
+  app.post('/api/games', requireFullAdmin, async (req, res) => {
     try {
       const gameData = insertGameSchema.parse(req.body);
       const game = await storage.createGame(gameData);
@@ -407,7 +473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update game (with name change restrictions)
-  app.patch('/api/games/:gameId', requireAdmin, async (req, res) => {
+  app.patch('/api/games/:gameId', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);
       if (!game) {
@@ -582,7 +648,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/games/:gameId/detailed-leaderboard', requireAdmin, async (req, res) => {
+  app.get('/api/admin/games/:gameId/detailed-leaderboard', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);
       if (!game) {
@@ -651,7 +717,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/admin/sessions/:sessionId/participants/:participantId/submission', requireAdmin, async (req, res) => {
+  app.patch('/api/admin/sessions/:sessionId/participants/:participantId/submission', makeGameAccessMiddleware(async (req) => {
+    const session = await storage.getSession(req.params.sessionId);
+    return session?.gameId || '';
+  }), async (req, res) => {
     try {
       const { sessionId, participantId } = req.params;
       const { vote, guessYesCount } = req.body;
@@ -701,7 +770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/games/:gameId/export', requireAdmin, async (req, res) => {
+  app.get('/api/admin/games/:gameId/export', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
     try {
       const game = await storage.getGame(req.params.gameId);
       if (!game) {
@@ -802,7 +871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sessions
-  app.post('/api/games/:gameId/sessions', async (req, res) => {
+  app.post('/api/games/:gameId/sessions', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
     try {
       const sessionData = insertSessionSchema.parse({
         ...req.body,
@@ -815,7 +884,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/sessions/:sessionId', async (req, res) => {
+  app.patch('/api/sessions/:sessionId', makeGameAccessMiddleware(async (req) => {
+    const session = await storage.getSession(req.params.sessionId);
+    return session?.gameId || '';
+  }), async (req, res) => {
     try {
       const session = await storage.getSession(req.params.sessionId);
       if (!session) {
@@ -892,7 +964,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/sessions/:sessionId/start', async (req, res) => {
+  app.post('/api/sessions/:sessionId/start', makeGameAccessMiddleware(async (req) => {
+    const session = await storage.getSession(req.params.sessionId);
+    return session?.gameId || '';
+  }), async (req, res) => {
     try {
       const session = await storage.getSession(req.params.sessionId);
       if (!session || session.status !== 'draft') {
@@ -929,7 +1004,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/sessions/:sessionId/end', async (req, res) => {
+  app.post('/api/sessions/:sessionId/end', makeGameAccessMiddleware(async (req) => {
+    const session = await storage.getSession(req.params.sessionId);
+    return session?.gameId || '';
+  }), async (req, res) => {
     try {
       const session = await storage.getSession(req.params.sessionId);
       if (!session || session.status !== 'live') {

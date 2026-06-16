@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock, ArrowLeft } from "lucide-react";
+import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock, ArrowLeft, UserPlus, Trash2, Shield } from "lucide-react";
 
 interface Session {
   id: string;
@@ -30,6 +30,14 @@ interface Game {
   status: string;
 }
 
+interface GameAdmin {
+  id: string;
+  gameId: string;
+  email: string;
+  invitedByEmail: string | null;
+  createdAt: string;
+}
+
 export default function AdminConsole() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
@@ -45,11 +53,18 @@ export default function AdminConsole() {
   const [isEditingGameName, setIsEditingGameName] = useState(false);
   const [editGameName, setEditGameName] = useState("");
 
+  const [newAdminEmail, setNewAdminEmail] = useState("");
+
   // Check if admin is authenticated
   // Check authentication with Google OAuth
-  const { data: adminUser, isLoading: authLoading } = useQuery<{isAdmin: boolean, name: string, email: string}>({
+  const { data: adminUser, isLoading: authLoading } = useQuery<{isAdmin: boolean, isFullAdmin: boolean, name: string, email: string}>({
     queryKey: ["/api/admin/me"],
     retry: false,
+  });
+
+  const { data: gameAdminsList, refetch: refetchGameAdmins } = useQuery<GameAdmin[]>({
+    queryKey: ["/api/admin/games", gameId, "admins"],
+    enabled: !!gameId && !!adminUser?.isFullAdmin,
   });
 
   useEffect(() => {
@@ -245,6 +260,35 @@ export default function AdminConsole() {
     }
   });
 
+  const addGameAdminMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("POST", `/api/admin/games/${gameId}/admins`, { email });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games", gameId, "admins"] });
+      setNewAdminEmail("");
+      toast({ title: "Success", description: "Game admin added" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to add game admin", variant: "destructive" });
+    }
+  });
+
+  const removeGameAdminMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const response = await apiRequest("DELETE", `/api/admin/games/${gameId}/admins/${encodeURIComponent(email)}`);
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games", gameId, "admins"] });
+      toast({ title: "Success", description: "Game admin removed" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove game admin", variant: "destructive" });
+    }
+  });
+
   const handleLogout = () => {
     logoutMutation.mutate();
   };
@@ -375,57 +419,59 @@ export default function AdminConsole() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {/* Create New Game Section */}
-                <div className="border-b pb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-medium">Create New Game</h3>
-                    {!showCreateGame && (
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setShowCreateGame(true)}
-                        data-testid="button-show-create-game"
-                      >
-                        + New Game
-                      </Button>
+                {/* Create New Game Section — full admins only */}
+                {adminUser?.isFullAdmin && (
+                  <div className="border-b pb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-medium">Create New Game</h3>
+                      {!showCreateGame && (
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setShowCreateGame(true)}
+                          data-testid="button-show-create-game"
+                        >
+                          + New Game
+                        </Button>
+                      )}
+                    </div>
+                    
+                    {showCreateGame && (
+                      <div className="space-y-3 bg-muted/30 p-4 rounded-lg">
+                        <div>
+                          <Label htmlFor="game-name">Game Name</Label>
+                          <Input
+                            id="game-name"
+                            placeholder="Enter game name..."
+                            value={newGameName}
+                            onChange={(e) => setNewGameName(e.target.value)}
+                            className="mt-1"
+                            data-testid="input-game-name"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Button 
+                            onClick={handleCreateGame}
+                            disabled={createGameMutation.isPending || !newGameName.trim()}
+                            data-testid="button-create-game"
+                          >
+                            {createGameMutation.isPending ? "Creating..." : "Create Game"}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            onClick={() => {
+                              setShowCreateGame(false);
+                              setNewGameName("");
+                            }}
+                            data-testid="button-cancel-create"
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
                     )}
                   </div>
-                  
-                  {showCreateGame && (
-                    <div className="space-y-3 bg-muted/30 p-4 rounded-lg">
-                      <div>
-                        <Label htmlFor="game-name">Game Name</Label>
-                        <Input
-                          id="game-name"
-                          placeholder="Enter game name..."
-                          value={newGameName}
-                          onChange={(e) => setNewGameName(e.target.value)}
-                          className="mt-1"
-                          data-testid="input-game-name"
-                        />
-                      </div>
-                      <div className="flex items-center space-x-3">
-                        <Button 
-                          onClick={handleCreateGame}
-                          disabled={createGameMutation.isPending || !newGameName.trim()}
-                          data-testid="button-create-game"
-                        >
-                          {createGameMutation.isPending ? "Creating..." : "Create Game"}
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          onClick={() => {
-                            setShowCreateGame(false);
-                            setNewGameName("");
-                          }}
-                          data-testid="button-cancel-create"
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
 
                 {/* Existing Games List */}
                 {adminGames && adminGames.length > 0 ? (
@@ -636,6 +682,68 @@ export default function AdminConsole() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Manage Admins Card — full admins only */}
+        {adminUser?.isFullAdmin && (
+          <Card className="shadow-lg border border-border mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Shield className="w-5 h-5" />
+                <span>Manage Game Admins</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Game admins can manage sessions, view the leaderboard, and edit submissions for this game. They cannot create new games or invite other admins.
+              </p>
+              {/* Current admins list */}
+              {gameAdminsList && gameAdminsList.length > 0 ? (
+                <div className="space-y-2 mb-4">
+                  {gameAdminsList.map((ga) => (
+                    <div key={ga.id} className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                      <span className="text-sm font-medium">{ga.email}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => removeGameAdminMutation.mutate(ga.email)}
+                        disabled={removeGameAdminMutation.isPending}
+                        data-testid={`button-remove-admin-${ga.email}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mb-4">No game admins yet.</p>
+              )}
+              {/* Add admin input */}
+              <div className="flex items-center space-x-2">
+                <Input
+                  placeholder="email@example.com"
+                  value={newAdminEmail}
+                  onChange={(e) => setNewAdminEmail(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newAdminEmail.trim()) {
+                      addGameAdminMutation.mutate(newAdminEmail.trim());
+                    }
+                  }}
+                  className="flex-1"
+                  data-testid="input-new-admin-email"
+                />
+                <Button
+                  onClick={() => addGameAdminMutation.mutate(newAdminEmail.trim())}
+                  disabled={addGameAdminMutation.isPending || !newAdminEmail.trim()}
+                  data-testid="button-add-admin"
+                >
+                  <UserPlus className="w-4 h-4 mr-1" />
+                  {addGameAdminMutation.isPending ? "Adding..." : "Add Admin"}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Live Lock Banner */}
         {hasLiveSession && (

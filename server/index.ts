@@ -5,6 +5,8 @@ import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { storage } from "./storage";
+import { runMigrations } from "./db";
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy for secure cookies behind Replit proxy
@@ -99,19 +101,27 @@ try {
     callbackURL: oauthConfig.callbackURL
   },
   async (accessToken: any, refreshToken: any, profile: any, done: any) => {
-    // Check if user email is in admin allowlist
-    const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
-    const userEmail = profile.emails?.[0]?.value;
-    
-    if (userEmail && adminEmails.includes(userEmail)) {
-      return done(null, {
-        id: profile.id,
-        email: userEmail,
-        name: profile.displayName,
-        isAdmin: true
-      });
-    } else {
+    try {
+      const adminEmails = process.env.ADMIN_EMAILS?.split(',').map(email => email.trim()) || [];
+      const userEmail = profile.emails?.[0]?.value;
+
+      if (!userEmail) {
+        return done(null, false);
+      }
+
+      if (adminEmails.includes(userEmail)) {
+        return done(null, { id: profile.id, email: userEmail, name: profile.displayName, isAdmin: true, isFullAdmin: true });
+      }
+
+      // Check if user is a game admin for any game
+      const gameAdminGames = await storage.getGamesByAdminEmail(userEmail);
+      if (gameAdminGames.length > 0) {
+        return done(null, { id: profile.id, email: userEmail, name: profile.displayName, isAdmin: true, isFullAdmin: false });
+      }
+
       return done(null, false);
+    } catch (err) {
+      return done(err as Error);
     }
   }));
   
@@ -137,8 +147,17 @@ function requireAdmin(req: any, res: Response, next: NextFunction) {
   }
 }
 
+function requireFullAdmin(req: any, res: Response, next: NextFunction) {
+  if (req.user && req.user.isAdmin && req.user.isFullAdmin) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Full admin access required' });
+  }
+}
+
 // Make middleware available to routes
 app.locals.requireAdmin = requireAdmin;
+app.locals.requireFullAdmin = requireFullAdmin;
 
 app.use((req, res, next) => {
   const start = Date.now();
@@ -176,6 +195,7 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  await runMigrations();
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {

@@ -18,6 +18,16 @@ export const games = pgTable("games", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const gameAdmins = pgTable("game_admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: varchar("game_id").notNull().references(() => games.id, { onDelete: "cascade" }),
+  email: text("email").notNull(),
+  invitedByEmail: text("invited_by_email"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  gameEmailUnique: unique("unique_game_admin_email").on(table.gameId, table.email),
+}));
+
 export const sessions = pgTable("sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").notNull().references(() => games.id, { onDelete: "cascade" }),
@@ -75,6 +85,13 @@ export const insertGameSchema = createInsertSchema(games).omit({
   createdAt: true,
 });
 
+export const insertGameAdminSchema = createInsertSchema(gameAdmins).omit({
+  id: true,
+  createdAt: true,
+}).extend({
+  email: z.string().email("Valid email required"),
+});
+
 export const insertSessionSchema = createInsertSchema(sessions).omit({
   id: true,
   createdAt: true,
@@ -106,6 +123,8 @@ export type AdminUser = typeof adminUsers.$inferSelect;
 export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
 export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
+export type GameAdmin = typeof gameAdmins.$inferSelect;
+export type InsertGameAdmin = z.infer<typeof insertGameAdminSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Participant = typeof participants.$inferSelect;

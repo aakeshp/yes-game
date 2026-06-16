@@ -13,3 +13,16 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 export const db = drizzle({ client: pool, schema });
+
+export async function runMigrations() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS game_admins (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      game_id varchar NOT NULL REFERENCES games(id) ON DELETE CASCADE,
+      email text NOT NULL,
+      invited_by_email text,
+      created_at timestamp DEFAULT NOW(),
+      UNIQUE(game_id, email)
+    )
+  `);
+}

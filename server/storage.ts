@@ -1,7 +1,7 @@
-import { type AdminUser, type InsertAdminUser, type Game, type InsertGame, type Session, type InsertSession, type Participant, type InsertParticipant, type Submission, type InsertSubmission, type SessionPoints, type GameWithLeaderboard, type SessionResults } from "@shared/schema";
+import { type AdminUser, type InsertAdminUser, type Game, type InsertGame, type GameAdmin, type InsertGameAdmin, type Session, type InsertSession, type Participant, type InsertParticipant, type Submission, type InsertSubmission, type SessionPoints, type GameWithLeaderboard, type SessionResults } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { adminUsers, games, sessions, participants, submissions, sessionPoints } from "@shared/schema";
+import { adminUsers, games, gameAdmins, sessions, participants, submissions, sessionPoints } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
@@ -39,6 +39,13 @@ export interface IStorage {
   calculateAndStoreSessionResults(sessionId: string): Promise<SessionResults>;
   recalculateSessionPoints(sessionId: string): Promise<void>;
   getParticipantLeaderboardForGame(gameId: string): Promise<Array<{ participantId: string; displayName: string; totalPoints: number; sessionsPlayed: number }>>;
+
+  // Game Admins
+  getGameAdminsByGameId(gameId: string): Promise<GameAdmin[]>;
+  getGamesByAdminEmail(email: string): Promise<Game[]>;
+  createGameAdmin(data: InsertGameAdmin): Promise<GameAdmin>;
+  deleteGameAdmin(gameId: string, email: string): Promise<void>;
+  isGameAdmin(gameId: string, email: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -48,6 +55,7 @@ export class MemStorage implements IStorage {
   private submissions: Map<string, Submission> = new Map();
   private sessionPoints: Map<string, SessionPoints> = new Map();
   private gameCodeMap: Map<string, string> = new Map(); // code -> gameId
+  private gameAdminsStore: Map<string, GameAdmin> = new Map();
 
   // Helper to generate unique 6-digit codes
   private generateGameCode(): string {
@@ -330,6 +338,39 @@ export class MemStorage implements IStorage {
     });
 
     return leaderboard.sort((a, b) => b.totalPoints - a.totalPoints);
+  }
+
+  async getGameAdminsByGameId(gameId: string): Promise<GameAdmin[]> {
+    return Array.from(this.gameAdminsStore.values()).filter(ga => ga.gameId === gameId);
+  }
+
+  async getGamesByAdminEmail(email: string): Promise<Game[]> {
+    const adminGameIds = new Set(
+      Array.from(this.gameAdminsStore.values())
+        .filter(ga => ga.email === email)
+        .map(ga => ga.gameId)
+    );
+    return Array.from(this.games.values()).filter(g => adminGameIds.has(g.id));
+  }
+
+  async createGameAdmin(data: InsertGameAdmin): Promise<GameAdmin> {
+    const id = randomUUID();
+    const ga: GameAdmin = { ...data, id, invitedByEmail: data.invitedByEmail || null, createdAt: new Date() };
+    this.gameAdminsStore.set(id, ga);
+    return ga;
+  }
+
+  async deleteGameAdmin(gameId: string, email: string): Promise<void> {
+    for (const [id, ga] of this.gameAdminsStore) {
+      if (ga.gameId === gameId && ga.email === email) {
+        this.gameAdminsStore.delete(id);
+        break;
+      }
+    }
+  }
+
+  async isGameAdmin(gameId: string, email: string): Promise<boolean> {
+    return Array.from(this.gameAdminsStore.values()).some(ga => ga.gameId === gameId && ga.email === email);
   }
 }
 
@@ -698,6 +739,37 @@ export class DatabaseStorage implements IStorage {
       totalPoints: Number(r.totalPoints),
       sessionsPlayed: Number(r.sessionsPlayed)
     }));
+  }
+
+  async getGameAdminsByGameId(gameId: string): Promise<GameAdmin[]> {
+    return await db.select().from(gameAdmins).where(eq(gameAdmins.gameId, gameId));
+  }
+
+  async getGamesByAdminEmail(email: string): Promise<Game[]> {
+    const rows = await db
+      .select({ game: games })
+      .from(games)
+      .innerJoin(gameAdmins, eq(games.id, gameAdmins.gameId))
+      .where(eq(gameAdmins.email, email));
+    return rows.map(r => r.game);
+  }
+
+  async createGameAdmin(data: InsertGameAdmin): Promise<GameAdmin> {
+    const [ga] = await db.insert(gameAdmins).values(data).returning();
+    return ga;
+  }
+
+  async deleteGameAdmin(gameId: string, email: string): Promise<void> {
+    await db.delete(gameAdmins).where(
+      sql`${gameAdmins.gameId} = ${gameId} AND ${gameAdmins.email} = ${email}`
+    );
+  }
+
+  async isGameAdmin(gameId: string, email: string): Promise<boolean> {
+    const [ga] = await db.select().from(gameAdmins).where(
+      sql`${gameAdmins.gameId} = ${gameId} AND ${gameAdmins.email} = ${email}`
+    );
+    return !!ga;
   }
 }
 
