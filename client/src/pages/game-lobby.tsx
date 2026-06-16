@@ -88,8 +88,16 @@ export default function GameLobby() {
       queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "leaderboard"] });
       toast({ title: "Name updated", description: "Your display name has been saved." });
     },
-    onError: () => {
-      toast({ title: "Error", description: "Failed to update your display name.", variant: "destructive" });
+    onError: (error: Error) => {
+      let description = "Failed to update your display name.";
+      try {
+        const match = error.message.match(/^\d+: (.*)/s);
+        if (match) {
+          const parsed = JSON.parse(match[1]);
+          if (parsed.error) description = parsed.error;
+        }
+      } catch {}
+      toast({ title: "Error", description, variant: "destructive" });
     },
   });
 

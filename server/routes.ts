@@ -1197,6 +1197,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (participant.playerUserId !== req.session.playerUser.id) {
         return res.status(403).json({ error: 'Not authorized to rename this participant' });
       }
+      const nameConflict = await storage.getParticipantByGameAndName(participant.gameId, displayName.trim());
+      if (nameConflict && nameConflict.id !== id) {
+        return res.status(409).json({ error: 'That name is already taken in this game. Please choose a different name.' });
+      }
       await storage.updateParticipantDisplayName(id, displayName.trim());
       broadcastToAll({
         type: 'participant:renamed',
