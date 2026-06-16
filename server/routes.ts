@@ -341,25 +341,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin Authentication (Google OAuth only)
 
   // Admin Google OAuth routes
-  app.get('/auth/google', (req, res, next) => {
+  app.get('/auth/google', (req: any, res, next) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🚀 OAuth Request - Starting Google authentication');
     }
-    
+    // Clear any stale player auth flag so callback knows this is admin
+    delete req.session.pendingPlayerAuth;
     passport.authenticate('google-admin', { 
       scope: ['profile', 'email']
     })(req, res, next);
   });
 
-  app.get('/auth/google/callback',
-    (req, res, next) => {
+  // Player Google OAuth — sets a session flag so the shared callback routes correctly
+  app.get('/auth/google/player', (req: any, res, next) => {
+    req.session.pendingPlayerAuth = true;
+    req.session.save(() => {
+      passport.authenticate('google-player', {
+        scope: ['profile', 'email']
+      })(req, res, next);
+    });
+  });
+
+  // Shared Google OAuth callback — handles both admin and player flows
+  app.get('/auth/google/callback', (req: any, res: any, next: any) => {
+    const isPlayerFlow = req.session?.pendingPlayerAuth === true;
+
+    if (isPlayerFlow) {
+      delete req.session.pendingPlayerAuth;
+      passport.authenticate('google-player', (err: any, _user: any) => {
+        if (err) {
+          console.error('Player OAuth error:', err);
+          return res.redirect('/');
+        }
+        req.session.save((saveErr: any) => {
+          if (saveErr) console.error('Session save error during player OAuth:', saveErr);
+          res.redirect('/');
+        });
+      })(req, res, next);
+    } else {
       if (process.env.NODE_ENV === 'development') {
         console.log('🔄 OAuth Callback - Received from Google');
         console.log('🔄 OAuth Callback - Processing authentication...');
       }
-      passport.authenticate('google-admin', { 
+      passport.authenticate('google-admin', {
         failureRedirect: '/admin/login-failed',
-        failureMessage: true 
+        failureMessage: true
       })(req, res, (err: any) => {
         if (err) {
           if (process.env.NODE_ENV === 'development') {
@@ -367,41 +393,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           return res.redirect('/admin/login-failed');
         }
-        next();
-      });
-    },
-    (req: any, res) => {
-      req.session.save((err: any) => {
-        if (err) {
-          console.error('Session save error during OAuth:', err);
-          return res.redirect('/admin/login-failed');
-        }
-        res.redirect('/admin/console');
+        req.session.save((saveErr: any) => {
+          if (saveErr) {
+            console.error('Session save error during OAuth:', saveErr);
+            return res.redirect('/admin/login-failed');
+          }
+          res.redirect('/admin/console');
+        });
       });
     }
-  );
-
-  // Player Google OAuth routes
-  app.get('/auth/google/player', (req, res, next) => {
-    passport.authenticate('google-player', {
-      scope: ['profile', 'email']
-    })(req, res, next);
-  });
-
-  app.get('/auth/google/player/callback', (req: any, res: any, next: any) => {
-    passport.authenticate('google-player', (err: any, _user: any) => {
-      if (err) {
-        console.error('Player OAuth error:', err);
-        return res.redirect('/');
-      }
-      // req.session.playerUser was set inside the strategy callback
-      req.session.save((saveErr: any) => {
-        if (saveErr) {
-          console.error('Session save error during player OAuth:', saveErr);
-        }
-        res.redirect('/');
-      });
-    })(req, res, next);
   });
 
   // Player API routes

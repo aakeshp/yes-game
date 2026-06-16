@@ -132,11 +132,12 @@ try {
     }
   }));
 
-  // Player OAuth strategy — stores identity in req.session.playerUser, not req.user
+  // Player OAuth strategy — uses same callbackURL as admin (already registered in Google Console)
+  // The /auth/google/callback handler distinguishes flows via req.session.pendingPlayerAuth
   passport.use('google-player', new (GoogleStrategy as any)({
     clientID: oauthConfig.clientID,
     clientSecret: oauthConfig.clientSecret,
-    callbackURL: oauthConfig.playerCallbackURL,
+    callbackURL: oauthConfig.adminCallbackURL,
     passReqToCallback: true
   },
   async (req: any, accessToken: any, refreshToken: any, profile: any, done: any) => {
