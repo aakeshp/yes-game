@@ -142,12 +142,20 @@ export default function LiveSession() {
       toast({ title: "Error", description: data.message || "Something went wrong", variant: "destructive" });
     };
 
+    const handleParticipantRenamed = (data: any) => {
+      setParticipant((prev) => {
+        if (!prev || prev.id !== data.participantId) return prev;
+        return { ...prev, displayName: data.displayName };
+      });
+    };
+
     socket.on('session:joined', handleSessionJoined);
     socket.on('session:started', handleSessionStarted);
     socket.on('session:tick', handleSessionTick);
     socket.on('session:results', handleSessionResults);
     socket.on('session:submitted', handleSubmitted);
     socket.on('error', handleError);
+    socket.on('participant:renamed', handleParticipantRenamed);
 
     return () => {
       socket.off('session:joined', handleSessionJoined);
@@ -156,6 +164,7 @@ export default function LiveSession() {
       socket.off('session:results', handleSessionResults);
       socket.off('session:submitted', handleSubmitted);
       socket.off('error', handleError);
+      socket.off('participant:renamed', handleParticipantRenamed);
     };
   }, [socket, sessionId, navigate, toast]);
 

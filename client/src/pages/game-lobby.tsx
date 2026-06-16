@@ -85,6 +85,7 @@ export default function GameLobby() {
       await apiRequest("PATCH", `/api/participants/${participantId}`, { displayName });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "leaderboard"] });
       toast({ title: "Name updated", description: "Your display name has been saved." });
     },
     onError: () => {

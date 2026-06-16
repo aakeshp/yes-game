@@ -1198,6 +1198,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Not authorized to rename this participant' });
       }
       await storage.updateParticipantDisplayName(id, displayName.trim());
+      broadcastToAll({
+        type: 'participant:renamed',
+        payload: { participantId: id, displayName: displayName.trim(), gameId: participant.gameId }
+      });
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to update display name' });
