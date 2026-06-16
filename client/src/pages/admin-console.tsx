@@ -227,12 +227,14 @@ export default function AdminConsole() {
   };
 
   const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/admin/logout", {});
-      return response.json();
-    },
+    mutationFn: () =>
+      Promise.all([
+        apiRequest("POST", "/api/admin/logout", {}),
+        apiRequest("POST", "/api/player/logout").catch(() => {}),
+      ]),
     onMutate: () => {
       queryClient.setQueryData(["/api/admin/me"], null);
+      queryClient.setQueryData(["/api/player/me"], null);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Logged out successfully" });
@@ -240,6 +242,7 @@ export default function AdminConsole() {
     },
     onError: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/player/me"] });
       toast({ title: "Error", description: "Logout failed", variant: "destructive" });
     }
   });
