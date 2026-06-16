@@ -20,7 +20,7 @@ const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT
 // PostgreSQL session store for production reliability
 const PgSession = connectPgSimple(session);
 
-app.use(session({
+const sessionMiddleware = session({
   store: new PgSession({
     conString: process.env.DATABASE_URL,
     tableName: 'user_sessions',
@@ -38,7 +38,11 @@ app.use(session({
     // This prevents interference with Replit platform cookies
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
-}));
+});
+
+app.use(sessionMiddleware);
+// Expose session middleware so WebSocket handler can parse sessions from upgrade requests
+app.locals.sessionMiddleware = sessionMiddleware;
 
 // Passport configuration
 app.use(passport.initialize());

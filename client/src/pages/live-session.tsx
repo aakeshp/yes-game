@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { usePlayerAuth } from "@/hooks/use-player-auth";
-import { ThumbsUp, ThumbsDown, Settings, LogOut } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Settings, LogOut, UserX } from "lucide-react";
 
 interface Session {
   id: string;
@@ -33,7 +33,7 @@ export default function LiveSession() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
   const { isConnected, socket, joinSession, submitVote } = useWebSocket();
-  const { playerUser } = usePlayerAuth();
+  const { playerUser, isLoading: playerLoading, logout, isLoggingOut } = usePlayerAuth();
   
   const [sessionId, setSessionId] = useState<string>("");
   const [participant, setParticipant] = useState<Participant | null>(null);
@@ -78,23 +78,22 @@ export default function LiveSession() {
     }
   }, [location]);
 
-  // Join session when connected — prefer authenticated player identity
+  // Join session when connected — requires Google sign-in
   useEffect(() => {
     if (!isConnected || !sessionId || hasJoined) return;
+    if (playerLoading) return; // Wait for auth check to complete
 
-    const playerName = localStorage.getItem("playerName");
-    const gameCode = new URLSearchParams(window.location.search).get("game") || "";
-    const participantId = localStorage.getItem(`participantId_${gameCode}`);
-
-    if (playerUser) {
-      setHasJoined(true);
-      joinSession(sessionId, playerUser.id, playerName || playerUser.displayName, undefined);
-    } else if (playerName) {
-      // Anonymous fallback (backward compat)
-      setHasJoined(true);
-      joinSession(sessionId, undefined, playerName, participantId || undefined);
+    if (!playerUser) {
+      // Not authenticated — send back to lobby with error
+      toast({ title: "Sign in required", description: "Please sign in with Google to join a session.", variant: "destructive" });
+      navigate("/");
+      return;
     }
-  }, [isConnected, sessionId, playerUser?.id]);
+
+    setHasJoined(true);
+    const playerName = localStorage.getItem("playerName");
+    joinSession(sessionId, playerName || playerUser.displayName);
+  }, [isConnected, sessionId, playerUser?.id, playerLoading]);
 
   useEffect(() => {
     if (!socket) return;
@@ -224,8 +223,21 @@ export default function LiveSession() {
               </div>
             </div>
             {playerUser && (
-              <div className="text-sm text-muted-foreground hidden sm:block">
-                Signed in as <span className="font-medium text-foreground">{playerUser.displayName}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-muted-foreground hidden sm:block">
+                  Signed in as <span className="font-medium text-foreground">{playerUser.displayName}</span>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => logout()}
+                  disabled={isLoggingOut}
+                  title="Sign out"
+                  data-testid="button-player-signout"
+                >
+                  <UserX className="w-4 h-4 mr-1" aria-hidden="true" />
+                  Sign out
+                </Button>
               </div>
             )}
           </div>

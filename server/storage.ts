@@ -52,6 +52,7 @@ export interface IStorage {
   getPlayerUserById(id: string): Promise<PlayerUser | undefined>;
   getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined>;
   linkParticipantToPlayer(participantId: string, playerUserId: string): Promise<boolean>;
+  updateParticipantDisplayName(participantId: string, displayName: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -407,6 +408,13 @@ export class MemStorage implements IStorage {
     if (!participant) return false;
     this.participants.set(participantId, { ...participant, playerUserId });
     return true;
+  }
+
+  async updateParticipantDisplayName(participantId: string, displayName: string): Promise<void> {
+    const participant = this.participants.get(participantId);
+    if (participant) {
+      this.participants.set(participantId, { ...participant, displayName });
+    }
   }
 }
 
@@ -842,6 +850,13 @@ export class DatabaseStorage implements IStorage {
       .where(sql`${participants.id} = ${participantId} AND ${participants.playerUserId} IS NULL`)
       .returning();
     return result.length > 0;
+  }
+
+  async updateParticipantDisplayName(participantId: string, displayName: string): Promise<void> {
+    await db
+      .update(participants)
+      .set({ displayName })
+      .where(eq(participants.id, participantId));
   }
 }
 

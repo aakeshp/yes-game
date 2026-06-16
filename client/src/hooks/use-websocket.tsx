@@ -35,8 +35,8 @@ export function useWebSocket() {
     };
   }, []);
 
-  const joinSession = (sessionId: string, playerUserId?: string, displayName?: string, participantId?: string) => {
-    gameSocket.send('session:join', { sessionId, playerUserId, displayName, participantId });
+  const joinSession = (sessionId: string, displayName?: string) => {
+    gameSocket.send('session:join', { sessionId, displayName });
   };
 
   const submitVote = (vote?: string, guessYesCount?: number) => {

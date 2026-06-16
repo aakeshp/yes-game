@@ -86,16 +86,17 @@ export default function GameLobby() {
     // Claim any existing anonymous participants (one-time per session)
     if (!claimedThisSession) {
       setClaimedThisSession(true);
-      const participantIds: string[] = [];
+      const items: { participantId: string; gameCode: string }[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key?.startsWith("participantId_")) {
+          const gameCode = key.replace("participantId_", "");
           const value = localStorage.getItem(key);
-          if (value) participantIds.push(value);
+          if (value && gameCode) items.push({ participantId: value, gameCode });
         }
       }
-      if (participantIds.length > 0) {
-        claimParticipants(participantIds);
+      if (items.length > 0) {
+        claimParticipants(items);
       }
     }
   }, [playerUser?.id]);

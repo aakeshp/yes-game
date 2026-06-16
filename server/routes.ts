@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertGameSchema, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertGameAdminSchema } from "@shared/schema";
+import { insertGameSchema, insertSessionSchema, insertParticipantSchema, insertSubmissionSchema, insertGameAdminSchema, type PlayerUser } from "@shared/schema";
 import { z } from "zod";
 import passport from "passport";
 
@@ -11,6 +11,7 @@ interface WebSocketConnection {
   sessionId?: string;
   participantId?: string;
   isAdmin?: boolean;
+  playerUser: PlayerUser | null;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -49,39 +50,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // WebSocket connection handler
   wss.on('connection', (ws, req) => {
-    connections.set(ws, { ws });
+    // Apply session middleware to read the session from the upgrade request cookie,
+    // so we can derive player identity server-side instead of trusting client payloads.
+    const sessionMiddleware = app.locals.sessionMiddleware;
+    sessionMiddleware(req as any, {} as any, () => {
+      const playerUser: PlayerUser | null = (req as any).session?.playerUser ?? null;
+      connections.set(ws, { ws, playerUser });
 
-    // Send connection confirmation
-    ws.send(JSON.stringify({ type: 'connection:ready' }));
+      // Send connection confirmation
+      ws.send(JSON.stringify({ type: 'connection:ready' }));
 
-    ws.on('message', async (message) => {
-      try {
-        const data = JSON.parse(message.toString());
-        // console.log('WebSocket message received:', data);
-        await handleWebSocketMessage(ws, data);
-      } catch (error) {
-        console.error('WebSocket message error:', error);
-        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
-      }
-    });
+      ws.on('message', async (message) => {
+        try {
+          const data = JSON.parse(message.toString());
+          await handleWebSocketMessage(ws, data);
+        } catch (error) {
+          console.error('WebSocket message error:', error);
+          ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+        }
+      });
 
-    ws.on('close', () => {
-      const connection = connections.get(ws);
-      if (connection?.sessionId) {
-        const room = sessionRooms.get(connection.sessionId);
-        room?.delete(ws);
-      }
-      connections.delete(ws);
-      console.log('WebSocket connection closed');
-    });
+      ws.on('close', () => {
+        const connection = connections.get(ws);
+        if (connection?.sessionId) {
+          const room = sessionRooms.get(connection.sessionId);
+          room?.delete(ws);
+        }
+        connections.delete(ws);
+        console.log('WebSocket connection closed');
+      });
 
-    ws.on('error', (error) => {
-      console.error('WebSocket connection error:', error);
-    });
+      ws.on('error', (error) => {
+        console.error('WebSocket connection error:', error);
+      });
 
-    // Keep connection alive with ping/pong
-    ws.on('pong', () => {
-      // Connection is alive
+      // Keep connection alive with ping/pong
+      ws.on('pong', () => {
+        // Connection is alive
+      });
     });
   });
 
@@ -104,9 +110,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   async function handleSessionJoin(ws: WebSocket, payload: any) {
     try {
-      const { sessionId, participantId, displayName, playerUserId } = payload;
+      const { sessionId, displayName } = payload;
       const connection = connections.get(ws);
       if (!connection) return;
+
+      // Require authenticated player identity derived from server-side session
+      if (!connection.playerUser) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Sign in with Google is required to join a session.' }));
+        return;
+      }
+
+      const playerUser = connection.playerUser;
 
       const session = await storage.getSession(sessionId);
       if (!session) {
@@ -114,35 +128,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      let participant;
-
-      if (playerUserId) {
-        // Authenticated player flow: verify player exists and find/create their participant
-        const playerUser = await storage.getPlayerUserById(playerUserId);
-        if (!playerUser) {
-          ws.send(JSON.stringify({ type: 'error', message: 'Invalid player session' }));
-          return;
-        }
-        participant = await storage.getParticipantByPlayerAndGame(playerUserId, session.gameId);
-        if (!participant) {
-          participant = await storage.createParticipant({
-            gameId: session.gameId,
-            displayName: displayName || playerUser.displayName,
-            ownerAdminUserId: null,
-            playerUserId
-          });
-        }
-      } else if (participantId) {
-        participant = await storage.getParticipant(participantId);
-      } else if (displayName) {
-        participant = await storage.getParticipantByGameAndName(session.gameId, displayName);
-        if (!participant) {
-          participant = await storage.createParticipant({
-            gameId: session.gameId,
-            displayName,
-            ownerAdminUserId: null
-          });
-        }
+      // Find or create participant linked to this authenticated player
+      let participant = await storage.getParticipantByPlayerAndGame(playerUser.id, session.gameId);
+      if (!participant) {
+        participant = await storage.createParticipant({
+          gameId: session.gameId,
+          displayName: displayName || playerUser.displayName,
+          ownerAdminUserId: null,
+          playerUserId: playerUser.id
+        });
+      } else if (displayName && displayName !== participant.displayName) {
+        // Player chose a different display name for this game — honour it
+        await storage.updateParticipantDisplayName(participant.id, displayName);
+        participant = { ...participant, displayName };
       }
 
       if (!participant) {
@@ -419,20 +417,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.session?.playerUser) {
       return res.status(401).json({ error: 'Not logged in as player' });
     }
-    const { participantIds } = req.body;
-    if (!Array.isArray(participantIds)) {
-      return res.status(400).json({ error: 'participantIds must be an array' });
+    const items = req.body;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Request body must be an array of { participantId, gameCode }' });
     }
     const playerUserId = req.session.playerUser.id;
     let claimed = 0;
-    for (const participantId of participantIds) {
-      if (typeof participantId === 'string' && participantId) {
-        try {
-          const linked = await storage.linkParticipantToPlayer(participantId, playerUserId);
-          if (linked) claimed++;
-        } catch (_) {
-          // non-critical
-        }
+    for (const item of items) {
+      if (!item?.participantId || !item?.gameCode) continue;
+      try {
+        const participant = await storage.getParticipant(item.participantId);
+        if (!participant) continue;
+        // Verify participant belongs to the game the client claims
+        const game = await storage.getGame(participant.gameId);
+        if (!game || game.code !== item.gameCode) continue;
+        // Only link unclaimed participants
+        if (participant.playerUserId !== null) continue;
+        const linked = await storage.linkParticipantToPlayer(item.participantId, playerUserId);
+        if (linked) claimed++;
+      } catch (_) {
+        // non-critical
       }
     }
     res.json({ claimed });

@@ -24,10 +24,10 @@ export function usePlayerAuth() {
     },
   });
 
-  const claimParticipants = async (participantIds: string[]) => {
-    if (!playerUser || participantIds.length === 0) return;
+  const claimParticipants = async (items: { participantId: string; gameCode: string }[]) => {
+    if (!playerUser || items.length === 0) return;
     try {
-      await apiRequest("POST", "/api/player/claim-participants", { participantIds });
+      await apiRequest("POST", "/api/player/claim-participants", items);
     } catch (_) {
       // Non-critical — best-effort linking
     }
