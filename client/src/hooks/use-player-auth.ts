@@ -17,14 +17,18 @@ export function usePlayerAuth() {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: () => apiRequest("POST", "/api/player/logout"),
+    mutationFn: () =>
+      Promise.all([
+        apiRequest("POST", "/api/player/logout"),
+        apiRequest("POST", "/api/admin/logout").catch(() => {}),
+      ]),
     onMutate: () => {
-      // Clear immediately on click — don't wait for the server response
       queryClient.setQueryData(["/api/player/me"], null);
+      queryClient.setQueryData(["/api/admin/me"], null);
     },
     onError: () => {
-      // Logout failed — re-fetch to restore the real server state
       queryClient.invalidateQueries({ queryKey: ["/api/player/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/me"] });
     },
   });
 

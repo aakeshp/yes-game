@@ -353,7 +353,7 @@ export default function GameLobby() {
             <div className="flex items-center space-x-3">
               {playerUser && (
                 <div className="flex items-center space-x-2">
-                  <span className="text-sm text-muted-foreground hidden sm:inline">
+                  <span className="text-sm text-muted-foreground">
                     Signed in as <span className="font-medium text-foreground">{playerUser.displayName}</span>
                   </span>
                   <Button
