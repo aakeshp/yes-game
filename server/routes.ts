@@ -1179,6 +1179,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Participants
+  app.patch('/api/participants/:id', async (req: any, res: any) => {
+    try {
+      if (!req.session?.playerUser) {
+        return res.status(401).json({ error: 'Not logged in as player' });
+      }
+      const { id } = req.params;
+      const displayName = req.body?.displayName;
+      if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
+        return res.status(400).json({ error: 'Display name is required' });
+      }
+      const participant = await storage.getParticipant(id);
+      if (!participant) {
+        return res.status(404).json({ error: 'Participant not found' });
+      }
+      if (participant.playerUserId !== req.session.playerUser.id) {
+        return res.status(403).json({ error: 'Not authorized to rename this participant' });
+      }
+      await storage.updateParticipantDisplayName(id, displayName.trim());
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to update display name' });
+    }
+  });
+
   app.post('/api/participants', async (req, res) => {
     try {
       const participantData = insertParticipantSchema.parse(req.body);

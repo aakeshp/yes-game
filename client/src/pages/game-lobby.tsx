@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { usePlayerAuth } from "@/hooks/use-player-auth";
-import { ChevronDown, ChevronUp, LogOut, Check, Pencil, X } from "lucide-react";
+import { ChevronDown, ChevronUp, LogOut, Pencil, Check, X } from "lucide-react";
 
 interface Session {
   id: string;
@@ -68,6 +68,7 @@ export default function GameLobby() {
   const [isGameCodeChanged, setIsGameCodeChanged] = useState(false);
   const [claimedThisSession, setClaimedThisSession] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
+  const [editingNameValue, setEditingNameValue] = useState("");
   const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState(() => {
     const saved = localStorage.getItem("leaderboardCollapsed");
     return saved === "true";
@@ -77,6 +78,18 @@ export default function GameLobby() {
     return saved === "true";
   });
   const { socket, disconnect } = useWebSocket();
+
+  const renameParticipantMutation = useMutation({
+    mutationFn: async ({ participantId, displayName }: { participantId: string; displayName: string }) => {
+      await apiRequest("PATCH", `/api/participants/${participantId}`, { displayName });
+    },
+    onSuccess: () => {
+      toast({ title: "Name updated", description: "Your display name has been saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update your display name.", variant: "destructive" });
+    },
+  });
 
   useEffect(() => {
     document.title = "Game Lobby – Yes Game";
@@ -407,63 +420,79 @@ export default function GameLobby() {
             {/* Player Name Input */}
             <div className="space-y-6">
               <div>
-                <Label htmlFor="player-name">Display Name</Label>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    id="player-name"
-                    type="text"
-                    placeholder={playerUser ? playerUser.displayName : "Sign in to play"}
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
-                    disabled={!playerUser || !isEditingName}
-                    readOnly={!isEditingName}
-                    className={!isEditingName ? "bg-muted cursor-default" : ""}
-                    data-testid="input-player-name"
-                  />
-                  {playerUser && !isEditingName && (
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="player-name">Display Name</Label>
+                  {playerUser && hasJoinedGame && !isEditingName && (
                     <Button
-                      size="icon"
-                      variant="outline"
-                      onClick={() => setIsEditingName(true)}
-                      aria-label="Edit display name"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setEditingNameValue(playerName);
+                        setIsEditingName(true);
+                      }}
                       data-testid="button-edit-name"
                     >
-                      <Pencil className="w-4 h-4" aria-hidden="true" />
+                      <Pencil className="w-3 h-3 mr-1" aria-hidden="true" />
+                      Edit name
                     </Button>
                   )}
-                  {playerUser && isEditingName && (
-                    <>
-                      <Button
-                        size="icon"
-                        variant="default"
-                        disabled={isRenaming || !playerName.trim()}
-                        onClick={async () => {
-                          await rename(playerName.trim());
-                          localStorage.setItem("playerName", playerName.trim());
-                          setIsEditingName(false);
-                          toast({ title: "Name updated", description: `Your name is now "${playerName.trim()}"` });
-                        }}
-                        aria-label="Save display name"
-                        data-testid="button-save-name"
-                      >
-                        <Check className="w-4 h-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => {
-                          setPlayerName(playerUser.displayName);
-                          setIsEditingName(false);
-                        }}
-                        aria-label="Cancel editing"
-                        data-testid="button-cancel-name"
-                      >
-                        <X className="w-4 h-4" aria-hidden="true" />
-                      </Button>
-                    </>
-                  )}
                 </div>
-                {playerUser && (
+                <Input
+                  id="player-name"
+                  type="text"
+                  placeholder={playerUser ? playerUser.displayName : "Sign in to play"}
+                  value={isEditingName ? editingNameValue : playerName}
+                  onChange={(e) => {
+                    if (isEditingName) {
+                      setEditingNameValue(e.target.value);
+                    } else {
+                      setPlayerName(e.target.value);
+                    }
+                  }}
+                  className="mt-2"
+                  disabled={!playerUser || (hasJoinedGame && !isEditingName)}
+                  data-testid="input-player-name"
+                />
+                {isEditingName && (
+                  <div className="flex gap-2 mt-2">
+                    <Button
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      disabled={!editingNameValue.trim() || renameParticipantMutation.isPending}
+                      onClick={async () => {
+                        const newName = editingNameValue.trim();
+                        if (!newName) return;
+                        const participantId = localStorage.getItem(`participantId_${gameCode}`);
+                        if (participantId) {
+                          await renameParticipantMutation.mutateAsync({ participantId, displayName: newName });
+                        }
+                        localStorage.setItem("playerName", newName);
+                        setPlayerName(newName);
+                        setIsEditingName(false);
+                      }}
+                      data-testid="button-save-name"
+                    >
+                      <Check className="w-3 h-3 mr-1" aria-hidden="true" />
+                      {renameParticipantMutation.isPending ? "Saving..." : "Save"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 px-3 text-xs"
+                      disabled={renameParticipantMutation.isPending}
+                      onClick={() => {
+                        setEditingNameValue("");
+                        setIsEditingName(false);
+                      }}
+                      data-testid="button-cancel-edit-name"
+                    >
+                      <X className="w-3 h-3 mr-1" aria-hidden="true" />
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                {playerUser && !hasJoinedGame && (
                   <p className="text-xs text-muted-foreground mt-1">
                     {isEditingName
                       ? "Press ✓ to save your new name or ✕ to cancel."
