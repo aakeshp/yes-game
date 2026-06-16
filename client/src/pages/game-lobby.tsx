@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { usePlayerAuth } from "@/hooks/use-player-auth";
-import { ChevronDown, ChevronUp, LogOut, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, LogOut, Check, Pencil, X } from "lucide-react";
 
 interface Session {
   id: string;
@@ -44,6 +44,7 @@ export default function GameLobby() {
   const [hasJoinedGame, setHasJoinedGame] = useState(false);
   const [isGameCodeChanged, setIsGameCodeChanged] = useState(false);
   const [claimedThisSession, setClaimedThisSession] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState(() => {
     const saved = localStorage.getItem("leaderboardCollapsed");
     return saved === "true";
@@ -373,31 +374,59 @@ export default function GameLobby() {
                     placeholder={playerUser ? playerUser.displayName : "Sign in to play"}
                     value={playerName}
                     onChange={(e) => setPlayerName(e.target.value)}
-                    disabled={!playerUser}
+                    disabled={!playerUser || !isEditingName}
+                    readOnly={!isEditingName}
+                    className={!isEditingName ? "bg-muted cursor-default" : ""}
                     data-testid="input-player-name"
                   />
-                  {playerUser && playerName.trim() && playerName.trim() !== playerUser.displayName && (
+                  {playerUser && !isEditingName && (
                     <Button
-                      size="sm"
+                      size="icon"
                       variant="outline"
-                      disabled={isRenaming}
-                      onClick={async () => {
-                        await rename(playerName.trim());
-                        toast({ title: "Name updated", description: `Your account name is now "${playerName.trim()}"` });
-                      }}
-                      data-testid="button-save-name"
+                      onClick={() => setIsEditingName(true)}
+                      aria-label="Edit display name"
+                      data-testid="button-edit-name"
                     >
-                      <Check className="w-4 h-4 mr-1" aria-hidden="true" />
-                      Save
+                      <Pencil className="w-4 h-4" aria-hidden="true" />
                     </Button>
+                  )}
+                  {playerUser && isEditingName && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="default"
+                        disabled={isRenaming || !playerName.trim()}
+                        onClick={async () => {
+                          await rename(playerName.trim());
+                          localStorage.setItem("playerName", playerName.trim());
+                          setIsEditingName(false);
+                          toast({ title: "Name updated", description: `Your name is now "${playerName.trim()}"` });
+                        }}
+                        aria-label="Save display name"
+                        data-testid="button-save-name"
+                      >
+                        <Check className="w-4 h-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => {
+                          setPlayerName(playerUser.displayName);
+                          setIsEditingName(false);
+                        }}
+                        aria-label="Cancel editing"
+                        data-testid="button-cancel-name"
+                      >
+                        <X className="w-4 h-4" aria-hidden="true" />
+                      </Button>
+                    </>
                   )}
                 </div>
                 {playerUser && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    You can customise how your name appears in this game.{" "}
-                    {playerName.trim() && playerName.trim() !== playerUser.displayName && (
-                      <span className="text-primary">Save to update your account name.</span>
-                    )}
+                    {isEditingName
+                      ? "Press ✓ to save your new name or ✕ to cancel."
+                      : "Click the pencil to update your display name."}
                   </p>
                 )}
               </div>
