@@ -371,10 +371,10 @@ export default function GameLobby() {
               <Button 
                 variant="ghost" 
                 size="sm" 
-                onClick={() => navigate("/admin")}
+                onClick={() => navigate(adminUser ? "/admin/console" : "/admin")}
                 data-testid="button-settings"
               >
-                Admin Login
+                {adminUser ? "Admin Console" : "Admin Login"}
               </Button>
             </div>
           </div>
@@ -399,11 +399,11 @@ export default function GameLobby() {
                     </p>
                     <Button
                       className="w-full sm:w-auto"
-                      disabled={playAsAdminMutation.isPending}
+                      disabled={playAsAdminMutation.isPending || isLoggingOut}
                       onClick={() => playAsAdminMutation.mutate()}
                       data-testid="button-play-as-admin"
                     >
-                      {playAsAdminMutation.isPending ? "Setting up..." : `Play as ${adminUser.name}`}
+                      {playAsAdminMutation.isPending || isLoggingOut ? "Setting up..." : `Play as ${adminUser.name}`}
                     </Button>
                   </>
                 ) : (
