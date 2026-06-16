@@ -50,6 +50,7 @@ export interface IStorage {
   // Player Users
   upsertPlayerUser(data: { googleId: string; email: string; displayName: string }): Promise<PlayerUser>;
   getPlayerUserById(id: string): Promise<PlayerUser | undefined>;
+  updatePlayerUserDisplayName(id: string, displayName: string): Promise<PlayerUser>;
   getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined>;
   linkParticipantToPlayer(participantId: string, playerUserId: string): Promise<boolean>;
   updateParticipantDisplayName(participantId: string, displayName: string): Promise<void>;
@@ -397,6 +398,14 @@ export class MemStorage implements IStorage {
 
   async getPlayerUserById(id: string): Promise<PlayerUser | undefined> {
     return this.playerUsersStore.get(id);
+  }
+
+  async updatePlayerUserDisplayName(id: string, displayName: string): Promise<PlayerUser> {
+    const existing = this.playerUsersStore.get(id);
+    if (!existing) throw new Error("Player user not found");
+    const updated: PlayerUser = { ...existing, displayName };
+    this.playerUsersStore.set(id, updated);
+    return updated;
   }
 
   async getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined> {
@@ -833,6 +842,16 @@ export class DatabaseStorage implements IStorage {
   async getPlayerUserById(id: string): Promise<PlayerUser | undefined> {
     const [user] = await db.select().from(playerUsers).where(eq(playerUsers.id, id));
     return user || undefined;
+  }
+
+  async updatePlayerUserDisplayName(id: string, displayName: string): Promise<PlayerUser> {
+    const [updated] = await db
+      .update(playerUsers)
+      .set({ displayName })
+      .where(eq(playerUsers.id, id))
+      .returning();
+    if (!updated) throw new Error("Player user not found");
+    return updated;
   }
 
   async getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined> {

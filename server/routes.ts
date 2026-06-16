@@ -413,6 +413,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch('/api/player/me', async (req: any, res: any) => {
+    if (!req.session?.playerUser) {
+      return res.status(401).json({ error: 'Not logged in as player' });
+    }
+    const { displayName } = req.body;
+    if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
+      return res.status(400).json({ error: 'displayName is required' });
+    }
+    try {
+      const updated = await storage.updatePlayerUserDisplayName(req.session.playerUser.id, displayName.trim());
+      req.session.playerUser = updated;
+      req.session.save((err: any) => {
+        if (err) console.error('Session save error during rename:', err);
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to update display name' });
+    }
+  });
+
   app.post('/api/player/logout', (req: any, res: any) => {
     const sessionId = req.sessionID;
     delete req.session.playerUser;

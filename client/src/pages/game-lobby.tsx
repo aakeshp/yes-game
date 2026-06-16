@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { usePlayerAuth } from "@/hooks/use-player-auth";
-import { ChevronDown, ChevronUp, LogOut } from "lucide-react";
+import { ChevronDown, ChevronUp, LogOut, Check } from "lucide-react";
 
 interface Session {
   id: string;
@@ -37,7 +37,7 @@ interface LeaderboardEntry {
 export default function GameLobby() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { playerUser, isLoading: playerLoading, logout, isLoggingOut, claimParticipants } = usePlayerAuth();
+  const { playerUser, isLoading: playerLoading, logout, isLoggingOut, claimParticipants, rename, isRenaming } = usePlayerAuth();
   const [playerName, setPlayerName] = useState("");
   const [gameCode, setGameCode] = useState("");
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
@@ -366,19 +366,38 @@ export default function GameLobby() {
             <div className="space-y-6">
               <div>
                 <Label htmlFor="player-name">Display Name</Label>
-                <Input
-                  id="player-name"
-                  type="text"
-                  placeholder={playerUser ? playerUser.displayName : "Sign in to play"}
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                  className="mt-2"
-                  disabled={!playerUser}
-                  data-testid="input-player-name"
-                />
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    id="player-name"
+                    type="text"
+                    placeholder={playerUser ? playerUser.displayName : "Sign in to play"}
+                    value={playerName}
+                    onChange={(e) => setPlayerName(e.target.value)}
+                    disabled={!playerUser}
+                    data-testid="input-player-name"
+                  />
+                  {playerUser && playerName.trim() && playerName.trim() !== playerUser.displayName && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isRenaming}
+                      onClick={async () => {
+                        await rename(playerName.trim());
+                        toast({ title: "Name updated", description: `Your account name is now "${playerName.trim()}"` });
+                      }}
+                      data-testid="button-save-name"
+                    >
+                      <Check className="w-4 h-4 mr-1" aria-hidden="true" />
+                      Save
+                    </Button>
+                  )}
+                </div>
                 {playerUser && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    You can customise how your name appears in this game.
+                    You can customise how your name appears in this game.{" "}
+                    {playerName.trim() && playerName.trim() !== playerUser.displayName && (
+                      <span className="text-primary">Save to update your account name.</span>
+                    )}
                   </p>
                 )}
               </div>
@@ -474,44 +493,55 @@ export default function GameLobby() {
                       <>
                         <div className="bg-muted/50 rounded-lg border border-border overflow-hidden">
                           <div className="divide-y divide-border">
-                            {calculateRanks(leaderboardData.leaderboard)
-                              .slice(0, showAllLeaderboard ? leaderboardData.leaderboard.length : 10)
-                              .map(({ entry, rank }, index) => (
-                              <div 
-                                key={entry.participantId} 
-                                className={`flex items-center justify-between p-4 transition-colors hover:bg-muted ${
-                                  rank <= 3 ? 'bg-yellow-50 dark:bg-yellow-950/20' : ''
-                                }`}
-                                data-testid={`leaderboard-row-${index}`}
-                              >
-                                <div className="flex items-center gap-4 flex-1">
-                                  <div className="flex items-center justify-center w-8 h-8">
-                                    {rank === 1 && <span role="img" aria-label="1st place" className="text-2xl">🥇</span>}
-                                    {rank === 2 && <span role="img" aria-label="2nd place" className="text-2xl">🥈</span>}
-                                    {rank === 3 && <span role="img" aria-label="3rd place" className="text-2xl">🥉</span>}
-                                    {rank > 3 && (
-                                      <span className="text-sm font-semibold text-muted-foreground" aria-label={`Rank ${rank}`}>
-                                        #{rank}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="flex-1">
-                                    <p className="font-medium text-foreground" data-testid={`text-participant-name-${index}`}>
-                                      {entry.displayName}
-                                    </p>
-                                    <p className="text-sm text-muted-foreground">
-                                      {entry.sessionsPlayed} session{entry.sessionsPlayed !== 1 ? 's' : ''} played
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="text-2xl font-bold text-primary" data-testid={`text-points-${index}`}>
-                                    {entry.totalPoints}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">points</p>
-                                </div>
-                              </div>
-                            ))}
+                            {(() => {
+                              const myParticipantId = localStorage.getItem(`participantId_${gameCode}`);
+                              return calculateRanks(leaderboardData.leaderboard)
+                                .slice(0, showAllLeaderboard ? leaderboardData.leaderboard.length : 10)
+                                .map(({ entry, rank }, index) => {
+                                  const isMe = !!myParticipantId && entry.participantId === myParticipantId;
+                                  return (
+                                    <div
+                                      key={entry.participantId}
+                                      className={`flex items-center justify-between p-4 transition-colors hover:bg-muted ${
+                                        isMe
+                                          ? 'bg-primary/10 border-l-4 border-primary'
+                                          : rank <= 3
+                                          ? 'bg-yellow-50 dark:bg-yellow-950/20'
+                                          : ''
+                                      }`}
+                                      data-testid={`leaderboard-row-${index}`}
+                                    >
+                                      <div className="flex items-center gap-4 flex-1">
+                                        <div className="flex items-center justify-center w-8 h-8">
+                                          {rank === 1 && <span role="img" aria-label="1st place" className="text-2xl">🥇</span>}
+                                          {rank === 2 && <span role="img" aria-label="2nd place" className="text-2xl">🥈</span>}
+                                          {rank === 3 && <span role="img" aria-label="3rd place" className="text-2xl">🥉</span>}
+                                          {rank > 3 && (
+                                            <span className="text-sm font-semibold text-muted-foreground" aria-label={`Rank ${rank}`}>
+                                              #{rank}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div className="flex-1">
+                                          <p className={`font-medium ${isMe ? 'text-primary' : 'text-foreground'}`} data-testid={`text-participant-name-${index}`}>
+                                            {entry.displayName}
+                                            {isMe && <span className="ml-2 text-xs font-normal text-primary/70">(you)</span>}
+                                          </p>
+                                          <p className="text-sm text-muted-foreground">
+                                            {entry.sessionsPlayed} session{entry.sessionsPlayed !== 1 ? 's' : ''} played
+                                          </p>
+                                        </div>
+                                      </div>
+                                      <div className="text-right">
+                                        <p className="text-2xl font-bold text-primary" data-testid={`text-points-${index}`}>
+                                          {entry.totalPoints}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">points</p>
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                            })()}
                           </div>
                         </div>
                         {leaderboardData.leaderboard.length > 10 && (

@@ -194,6 +194,10 @@ export default function Results() {
   const winners = results.participants.filter(p => p.points === 5);
   const closeGuessers = results.participants.filter(p => p.points === 3);
 
+  // Identify the current player's row for highlighting
+  const myGameCode = localStorage.getItem("currentGameCode");
+  const myParticipantId = myGameCode ? localStorage.getItem(`participantId_${myGameCode}`) : null;
+
   return (
     <>
       <CelebrationOverlay type={celebrationType} theme={celebrationTheme} />
@@ -308,11 +312,14 @@ export default function Results() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {results.participants.map((participant) => (
-                    <tr key={participant.participantId} className="hover:bg-muted/50 transition-colors">
+                  {results.participants.map((participant) => {
+                    const isMe = !!myParticipantId && participant.participantId === myParticipantId;
+                    return (
+                    <tr key={participant.participantId} className={`transition-colors ${isMe ? 'bg-primary/10 border-l-4 border-primary hover:bg-primary/15' : 'hover:bg-muted/50'}`}>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="font-medium text-foreground" data-testid={`participant-name-${participant.participantId}`}>
+                        <span className={`font-medium ${isMe ? 'text-primary' : 'text-foreground'}`} data-testid={`participant-name-${participant.participantId}`}>
                           {participant.displayName}
+                          {isMe && <span className="ml-2 text-xs font-normal text-primary/70">(you)</span>}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -341,7 +348,8 @@ export default function Results() {
                         </Badge>
                       </td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>

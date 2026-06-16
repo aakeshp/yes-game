@@ -24,6 +24,14 @@ export function usePlayerAuth() {
     },
   });
 
+  const renameMutation = useMutation({
+    mutationFn: (displayName: string) =>
+      apiRequest("PATCH", "/api/player/me", { displayName }),
+    onSuccess: (data: any) => {
+      queryClient.setQueryData(["/api/player/me"], data);
+    },
+  });
+
   const claimParticipants = async (items: { participantId: string; gameCode: string }[]) => {
     if (!playerUser || items.length === 0) return;
     try {
@@ -38,6 +46,8 @@ export function usePlayerAuth() {
     isLoading,
     logout: () => logoutMutation.mutate(),
     isLoggingOut: logoutMutation.isPending,
+    rename: (name: string) => renameMutation.mutate(name),
+    isRenaming: renameMutation.isPending,
     claimParticipants,
   };
 }
