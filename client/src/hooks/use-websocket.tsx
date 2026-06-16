@@ -21,7 +21,6 @@ export function useWebSocket() {
       }
     };
 
-    // Update connection state when WebSocket state changes
     const updateConnectionState = () => {
       setIsConnected(gameSocket.isReady());
     };
@@ -36,8 +35,8 @@ export function useWebSocket() {
     };
   }, []);
 
-  const joinSession = (sessionId: string, participantId?: string, displayName?: string) => {
-    gameSocket.send('session:join', { sessionId, participantId, displayName });
+  const joinSession = (sessionId: string, playerUserId?: string, displayName?: string, participantId?: string) => {
+    gameSocket.send('session:join', { sessionId, playerUserId, displayName, participantId });
   };
 
   const submitVote = (vote?: string, guessYesCount?: number) => {

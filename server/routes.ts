@@ -104,11 +104,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   async function handleSessionJoin(ws: WebSocket, payload: any) {
     try {
-      const { sessionId, participantId, displayName } = payload;
+      const { sessionId, participantId, displayName, playerUserId } = payload;
       const connection = connections.get(ws);
       if (!connection) return;
-      
-      // console.log(`Session join attempt: sessionId=${sessionId}, participantId=${participantId}, displayName=${displayName}`);
 
       const session = await storage.getSession(sessionId);
       if (!session) {
@@ -117,7 +115,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let participant;
-      if (participantId) {
+
+      if (playerUserId) {
+        // Authenticated player flow: verify player exists and find/create their participant
+        const playerUser = await storage.getPlayerUserById(playerUserId);
+        if (!playerUser) {
+          ws.send(JSON.stringify({ type: 'error', message: 'Invalid player session' }));
+          return;
+        }
+        participant = await storage.getParticipantByPlayerAndGame(playerUserId, session.gameId);
+        if (!participant) {
+          participant = await storage.createParticipant({
+            gameId: session.gameId,
+            displayName: displayName || playerUser.displayName,
+            ownerAdminUserId: null,
+            playerUserId
+          });
+        }
+      } else if (participantId) {
         participant = await storage.getParticipant(participantId);
       } else if (displayName) {
         participant = await storage.getParticipantByGameAndName(session.gameId, displayName);
@@ -319,13 +334,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin Authentication (Google OAuth only)
 
-  // Google OAuth routes
+  // Admin Google OAuth routes
   app.get('/auth/google', (req, res, next) => {
     if (process.env.NODE_ENV === 'development') {
       console.log('🚀 OAuth Request - Starting Google authentication');
     }
     
-    passport.authenticate('google', { 
+    passport.authenticate('google-admin', { 
       scope: ['profile', 'email']
     })(req, res, next);
   });
@@ -334,10 +349,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     (req, res, next) => {
       if (process.env.NODE_ENV === 'development') {
         console.log('🔄 OAuth Callback - Received from Google');
-        // Don't log query params as they contain sensitive tokens
         console.log('🔄 OAuth Callback - Processing authentication...');
       }
-      passport.authenticate('google', { 
+      passport.authenticate('google-admin', { 
         failureRedirect: '/admin/login-failed',
         failureMessage: true 
       })(req, res, (err: any) => {
@@ -351,7 +365,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     },
     (req: any, res) => {
-      // Explicitly save session before redirect to ensure cookie is set
       req.session.save((err: any) => {
         if (err) {
           console.error('Session save error during OAuth:', err);
@@ -361,6 +374,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
   );
+
+  // Player Google OAuth routes
+  app.get('/auth/google/player', (req, res, next) => {
+    passport.authenticate('google-player', {
+      scope: ['profile', 'email']
+    })(req, res, next);
+  });
+
+  app.get('/auth/google/player/callback', (req: any, res: any, next: any) => {
+    passport.authenticate('google-player', (err: any, _user: any) => {
+      if (err) {
+        console.error('Player OAuth error:', err);
+        return res.redirect('/');
+      }
+      // req.session.playerUser was set inside the strategy callback
+      req.session.save((saveErr: any) => {
+        if (saveErr) {
+          console.error('Session save error during player OAuth:', saveErr);
+        }
+        res.redirect('/');
+      });
+    })(req, res, next);
+  });
+
+  // Player API routes
+  app.get('/api/player/me', (req: any, res: any) => {
+    if (req.session?.playerUser) {
+      res.json(req.session.playerUser);
+    } else {
+      res.status(401).json({ error: 'Not logged in as player' });
+    }
+  });
+
+  app.post('/api/player/logout', (req: any, res: any) => {
+    delete req.session.playerUser;
+    req.session.save((err: any) => {
+      if (err) console.error('Session save error:', err);
+      res.json({ success: true });
+    });
+  });
+
+  app.post('/api/player/claim-participants', async (req: any, res: any) => {
+    if (!req.session?.playerUser) {
+      return res.status(401).json({ error: 'Not logged in as player' });
+    }
+    const { participantIds } = req.body;
+    if (!Array.isArray(participantIds)) {
+      return res.status(400).json({ error: 'participantIds must be an array' });
+    }
+    const playerUserId = req.session.playerUser.id;
+    let claimed = 0;
+    for (const participantId of participantIds) {
+      if (typeof participantId === 'string' && participantId) {
+        try {
+          const linked = await storage.linkParticipantToPlayer(participantId, playerUserId);
+          if (linked) claimed++;
+        } catch (_) {
+          // non-critical
+        }
+      }
+    }
+    res.json({ claimed });
+  });
 
   // Check current admin session
   app.get('/api/admin/me', (req: any, res) => {

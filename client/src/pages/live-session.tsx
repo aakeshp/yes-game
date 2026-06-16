@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { ThumbsUp, ThumbsDown, Settings } from "lucide-react";
+import { usePlayerAuth } from "@/hooks/use-player-auth";
+import { ThumbsUp, ThumbsDown, Settings, LogOut } from "lucide-react";
 
 interface Session {
   id: string;
@@ -32,6 +33,7 @@ export default function LiveSession() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
   const { isConnected, socket, joinSession, submitVote } = useWebSocket();
+  const { playerUser } = usePlayerAuth();
   
   const [sessionId, setSessionId] = useState<string>("");
   const [participant, setParticipant] = useState<Participant | null>(null);
@@ -44,20 +46,18 @@ export default function LiveSession() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [hasChangedSinceSubmit, setHasChangedSinceSubmit] = useState(false);
   const [timerAnnouncement, setTimerAnnouncement] = useState("");
+  const [hasJoined, setHasJoined] = useState(false);
   const announcedTimes = useRef<Set<number>>(new Set());
 
-  // Check if current user is an admin
   const { data: adminUser } = useQuery<{isAdmin: boolean, name: string, email: string}>({
     queryKey: ["/api/admin/me"],
     retry: false,
   });
 
-  // Set page title
   useEffect(() => {
     document.title = "Live Session – Yes Game";
   }, []);
 
-  // Timer announcements for screen readers
   useEffect(() => {
     if (timeRemaining === 30 && !announcedTimes.current.has(30)) {
       announcedTimes.current.add(30);
@@ -71,7 +71,6 @@ export default function LiveSession() {
     }
   }, [timeRemaining]);
 
-  // Extract session ID from URL
   useEffect(() => {
     const match = location.match(/\/session\/(.+)/);
     if (match) {
@@ -79,27 +78,24 @@ export default function LiveSession() {
     }
   }, [location]);
 
-  // Join session when connected
+  // Join session when connected — prefer authenticated player identity
   useEffect(() => {
-    if (isConnected && sessionId && !participant) {
-      const playerName = localStorage.getItem("playerName");
-      const gameCode = new URLSearchParams(window.location.search).get("game") || "";
-      const participantId = localStorage.getItem(`participantId_${gameCode}`);
-      
-      if (playerName) {
-        joinSession(sessionId, participantId || undefined, playerName);
-      }
+    if (!isConnected || !sessionId || hasJoined) return;
+
+    const playerName = localStorage.getItem("playerName");
+    const gameCode = new URLSearchParams(window.location.search).get("game") || "";
+    const participantId = localStorage.getItem(`participantId_${gameCode}`);
+
+    if (playerUser) {
+      setHasJoined(true);
+      joinSession(sessionId, playerUser.id, playerName || playerUser.displayName, undefined);
+    } else if (playerName) {
+      // Anonymous fallback (backward compat)
+      setHasJoined(true);
+      joinSession(sessionId, undefined, playerName, participantId || undefined);
     }
-  }, [isConnected, sessionId]); // Removed joinSession dependency to prevent infinite loops
+  }, [isConnected, sessionId, playerUser?.id]);
 
-  // Clean up when leaving the page
-  useEffect(() => {
-    return () => {
-      // No cleanup needed - connection handled by useWebSocket hook
-    };
-  }, []);
-
-  // WebSocket event listeners
   useEffect(() => {
     if (!socket) return;
 
@@ -130,7 +126,7 @@ export default function LiveSession() {
       setTimeRemaining(data.timeRemaining || 0);
     };
 
-    const handleSessionResults = (data: any) => {
+    const handleSessionResults = (_data: any) => {
       navigate(`/results/${sessionId}`);
     };
 
@@ -227,6 +223,11 @@ export default function LiveSession() {
                 <span>Live Session (Player)</span>
               </div>
             </div>
+            {playerUser && (
+              <div className="text-sm text-muted-foreground hidden sm:block">
+                Signed in as <span className="font-medium text-foreground">{playerUser.displayName}</span>
+              </div>
+            )}
           </div>
         </div>
       </header>
@@ -257,6 +258,7 @@ export default function LiveSession() {
                   </Button>
                 )}
                 <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-leave">
+                  <LogOut className="w-4 h-4 mr-1" aria-hidden="true" />
                   Leave Session
                 </Button>
               </div>
@@ -284,12 +286,7 @@ export default function LiveSession() {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">Time remaining</p>
-                {/* Screen-reader-only live announcements at key intervals */}
-                <div
-                  role="alert"
-                  aria-live="assertive"
-                  className="sr-only"
-                >
+                <div role="alert" aria-live="assertive" className="sr-only">
                   {timerAnnouncement}
                 </div>
               </div>

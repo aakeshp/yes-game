@@ -25,4 +25,18 @@ export async function runMigrations() {
       UNIQUE(game_id, email)
     )
   `);
+
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS player_users (
+      id varchar PRIMARY KEY DEFAULT gen_random_uuid(),
+      google_id text NOT NULL UNIQUE,
+      email text NOT NULL,
+      display_name text NOT NULL,
+      created_at timestamp DEFAULT NOW()
+    )
+  `);
+
+  await pool.query(`
+    ALTER TABLE participants ADD COLUMN IF NOT EXISTS player_user_id varchar REFERENCES player_users(id)
+  `);
 }

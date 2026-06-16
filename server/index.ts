@@ -64,7 +64,8 @@ const getOAuthConfig = () => {
     return {
       clientID: clientID,
       clientSecret: clientSecret,
-      callbackURL: `https://${productionDomain}/auth/google/callback`
+      adminCallbackURL: `https://${productionDomain}/auth/google/callback`,
+      playerCallbackURL: `https://${productionDomain}/auth/google/player/callback`
     };
   } else {
     // Development: Use Replit's dev domain and main credentials (GOOGLE_CLIENT_ID/SECRET are for dev)
@@ -84,7 +85,8 @@ const getOAuthConfig = () => {
     return {
       clientID: clientID,
       clientSecret: clientSecret,
-      callbackURL: `https://${devDomain}/auth/google/callback`
+      adminCallbackURL: `https://${devDomain}/auth/google/callback`,
+      playerCallbackURL: `https://${devDomain}/auth/google/player/callback`
     };
   }
 };
@@ -95,10 +97,11 @@ try {
   // Basic OAuth setup confirmation (production safe)
   console.log('OAuth setup complete');
 
-  passport.use(new GoogleStrategy({
+  // Admin OAuth strategy
+  passport.use('google-admin', new GoogleStrategy({
     clientID: oauthConfig.clientID,
     clientSecret: oauthConfig.clientSecret,
-    callbackURL: oauthConfig.callbackURL
+    callbackURL: oauthConfig.adminCallbackURL
   },
   async (accessToken: any, refreshToken: any, profile: any, done: any) => {
     try {
@@ -120,6 +123,27 @@ try {
       }
 
       return done(null, false);
+    } catch (err) {
+      return done(err as Error);
+    }
+  }));
+
+  // Player OAuth strategy — stores identity in req.session.playerUser, not req.user
+  passport.use('google-player', new (GoogleStrategy as any)({
+    clientID: oauthConfig.clientID,
+    clientSecret: oauthConfig.clientSecret,
+    callbackURL: oauthConfig.playerCallbackURL,
+    passReqToCallback: true
+  },
+  async (req: any, accessToken: any, refreshToken: any, profile: any, done: any) => {
+    try {
+      const email = profile.emails?.[0]?.value || '';
+      const displayName = profile.displayName || email;
+      const googleId = profile.id;
+
+      const playerUser = await storage.upsertPlayerUser({ googleId, email, displayName });
+      req.session.playerUser = playerUser;
+      return done(null, false); // Don't store in passport req.user
     } catch (err) {
       return done(err as Error);
     }
@@ -178,7 +202,7 @@ app.use((req, res, next) => {
       // Only log response body in development, and sanitize sensitive endpoints
       if (process.env.NODE_ENV === 'development' && capturedJsonResponse) {
         // Don't log response bodies for auth endpoints or user data
-        if (!path.includes('/auth') && !path.includes('/admin/me')) {
+        if (!path.includes('/auth') && !path.includes('/admin/me') && !path.includes('/player/me')) {
           logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
         }
       }

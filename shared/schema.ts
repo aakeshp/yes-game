@@ -28,6 +28,14 @@ export const gameAdmins = pgTable("game_admins", {
   gameEmailUnique: unique("unique_game_admin_email").on(table.gameId, table.email),
 }));
 
+export const playerUsers = pgTable("player_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  googleId: text("google_id").notNull().unique(),
+  email: text("email").notNull(),
+  displayName: text("display_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const sessions = pgTable("sessions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: varchar("game_id").notNull().references(() => games.id, { onDelete: "cascade" }),
@@ -48,6 +56,7 @@ export const participants = pgTable("participants", {
   gameId: varchar("game_id").notNull().references(() => games.id, { onDelete: "cascade" }),
   displayName: text("display_name").notNull(),
   ownerAdminUserId: varchar("owner_admin_user_id").references(() => adminUsers.id),
+  playerUserId: varchar("player_user_id").references(() => playerUsers.id),
   createdAt: timestamp("created_at").defaultNow(),
 }, (table) => ({
   gameIdIndex: index("idx_participants_game_id").on(table.gameId),
@@ -92,6 +101,11 @@ export const insertGameAdminSchema = createInsertSchema(gameAdmins).omit({
   email: z.string().email("Valid email required"),
 });
 
+export const insertPlayerUserSchema = createInsertSchema(playerUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertSessionSchema = createInsertSchema(sessions).omit({
   id: true,
   createdAt: true,
@@ -108,6 +122,7 @@ export const insertParticipantSchema = createInsertSchema(participants).omit({
   createdAt: true,
 }).extend({
   displayName: z.string().min(1, "Display name is required").max(50),
+  playerUserId: z.string().optional().nullable(),
 });
 
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({
@@ -125,6 +140,8 @@ export type Game = typeof games.$inferSelect;
 export type InsertGame = z.infer<typeof insertGameSchema>;
 export type GameAdmin = typeof gameAdmins.$inferSelect;
 export type InsertGameAdmin = z.infer<typeof insertGameAdminSchema>;
+export type PlayerUser = typeof playerUsers.$inferSelect;
+export type InsertPlayerUser = z.infer<typeof insertPlayerUserSchema>;
 export type Session = typeof sessions.$inferSelect;
 export type InsertSession = z.infer<typeof insertSessionSchema>;
 export type Participant = typeof participants.$inferSelect;

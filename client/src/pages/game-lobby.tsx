@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { usePlayerAuth } from "@/hooks/use-player-auth";
+import { ChevronDown, ChevronUp, LogOut } from "lucide-react";
 
 interface Session {
   id: string;
@@ -36,11 +37,13 @@ interface LeaderboardEntry {
 export default function GameLobby() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
+  const { playerUser, isLoading: playerLoading, logout, isLoggingOut, claimParticipants } = usePlayerAuth();
   const [playerName, setPlayerName] = useState("");
   const [gameCode, setGameCode] = useState("");
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [hasJoinedGame, setHasJoinedGame] = useState(false);
   const [isGameCodeChanged, setIsGameCodeChanged] = useState(false);
+  const [claimedThisSession, setClaimedThisSession] = useState(false);
   const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState(() => {
     const saved = localStorage.getItem("leaderboardCollapsed");
     return saved === "true";
@@ -51,7 +54,6 @@ export default function GameLobby() {
   });
   const { socket } = useWebSocket();
 
-  // Set page title
   useEffect(() => {
     document.title = "Game Lobby – Yes Game";
   }, []);
@@ -71,12 +73,39 @@ export default function GameLobby() {
     }
   }, []);
 
+  // Pre-fill name from Google profile and claim existing anonymous participants
+  useEffect(() => {
+    if (!playerUser) return;
+
+    // Pre-fill display name from Google if no saved name
+    const savedName = localStorage.getItem("playerName");
+    if (!savedName) {
+      setPlayerName(playerUser.displayName);
+    }
+
+    // Claim any existing anonymous participants (one-time per session)
+    if (!claimedThisSession) {
+      setClaimedThisSession(true);
+      const participantIds: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith("participantId_")) {
+          const value = localStorage.getItem(key);
+          if (value) participantIds.push(value);
+        }
+      }
+      if (participantIds.length > 0) {
+        claimParticipants(participantIds);
+      }
+    }
+  }, [playerUser?.id]);
+
   // Extract game code from URL if present
   useEffect(() => {
     const match = location.match(/\/play\/(.+)/);
     if (match) {
       setGameCode(match[1]);
-      setHasJoinedGame(true); // Auto-join if coming from URL
+      setHasJoinedGame(true);
     }
   }, [location]);
 
@@ -106,10 +135,7 @@ export default function GameLobby() {
     if (!currentGameId) return;
 
     const handleSessionResults = (data: any) => {
-      // Only invalidate queries if the event is for the current game
       if (data?.gameId !== currentGameId) return;
-      
-      // Invalidate leaderboard cache when a session completes
       queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "leaderboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "sessions"] });
     };
@@ -129,8 +155,13 @@ export default function GameLobby() {
   }, [currentGameId, socket]);
 
   const handleJoinGame = async () => {
+    if (!playerUser) {
+      toast({ title: "Sign in required", description: "Please sign in with Google to join a game", variant: "destructive" });
+      return;
+    }
+
     if (!playerName.trim()) {
-      toast({ title: "Error", description: "Please enter your name", variant: "destructive" });
+      toast({ title: "Error", description: "Please enter your display name", variant: "destructive" });
       return;
     }
 
@@ -141,19 +172,15 @@ export default function GameLobby() {
 
     try {
       localStorage.setItem("playerName", playerName);
-      localStorage.setItem(`participantId_${gameCode}`, ""); // Will be set when we join a session
       
-      // Clear previous game data if switching
       if (isGameCodeChanged) {
         const oldGameCode = localStorage.getItem("currentGameCode");
         if (oldGameCode) {
           localStorage.removeItem(`participantId_${oldGameCode}`);
         }
-        // Reset state for new game
         setCurrentGameId(null);
       }
       
-      // Join/switch to the game (this will trigger data fetching)
       localStorage.setItem("currentGameCode", gameCode);
       setHasJoinedGame(true);
       setIsGameCodeChanged(false);
@@ -176,8 +203,13 @@ export default function GameLobby() {
   };
 
   const handleJoinSession = async (session: Session) => {
+    if (!playerUser) {
+      toast({ title: "Sign in required", description: "Please sign in with Google to join a session", variant: "destructive" });
+      return;
+    }
+
     if (!playerName.trim()) {
-      toast({ title: "Error", description: "Please enter your name first", variant: "destructive" });
+      toast({ title: "Error", description: "Please enter your display name first", variant: "destructive" });
       return;
     }
 
@@ -187,14 +219,7 @@ export default function GameLobby() {
     }
 
     try {
-      // Create or get participant
-      const participantResponse = await apiRequest("POST", "/api/participants", {
-        gameId: currentGameId,
-        displayName: playerName,
-      });
-      const participant = await participantResponse.json();
-      localStorage.setItem(`participantId_${gameCode}`, participant.id);
-      
+      localStorage.setItem("playerName", playerName);
       navigate(`/session/${session.id}?game=${gameCode}`);
     } catch (error) {
       toast({ title: "Error", description: "Failed to join session", variant: "destructive" });
@@ -243,13 +268,9 @@ export default function GameLobby() {
     };
 
     return [...sessions].sort((a, b) => {
-      // First sort by status priority
       const priorityDiff = statusPriority[a.status] - statusPriority[b.status];
       if (priorityDiff !== 0) return priorityDiff;
-
-      // Within same status, sort by date (newest first)
-      // Sessions might not have createdAt, so we'll use the session order as fallback
-      return 0; // Keep original order within same status
+      return 0;
     });
   };
 
@@ -261,7 +282,6 @@ export default function GameLobby() {
     
     leaderboard.forEach((entry, index) => {
       if (index > 0 && entry.totalPoints < leaderboard[index - 1].totalPoints) {
-        // Points decreased, update rank to current position
         currentRank = index + 1;
       }
       rankedEntries.push({ entry, rank: currentRank });
@@ -282,7 +302,24 @@ export default function GameLobby() {
                 <span>Game Lobby</span>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3">
+              {playerUser && (
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-muted-foreground hidden sm:inline">
+                    Signed in as <span className="font-medium text-foreground">{playerUser.displayName}</span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={logout}
+                    disabled={isLoggingOut}
+                    data-testid="button-player-logout"
+                  >
+                    <LogOut className="w-4 h-4 mr-1" aria-hidden="true" />
+                    Sign Out
+                  </Button>
+                </div>
+              )}
               <Button 
                 variant="ghost" 
                 size="sm" 
@@ -303,20 +340,46 @@ export default function GameLobby() {
               <h2 className="text-3xl font-bold text-foreground mb-2">Game Lobby</h2>
               <p className="text-muted-foreground">Join a game and start playing!</p>
             </div>
+
+            {/* Sign-in prompt when not logged in */}
+            {!playerLoading && !playerUser && (
+              <div className="mb-6 p-5 bg-primary/5 border border-primary/20 rounded-lg text-center">
+                <p className="text-sm text-muted-foreground mb-3">
+                  Sign in with Google to track your scores and play across devices.
+                </p>
+                <a href="/auth/google/player">
+                  <Button className="w-full sm:w-auto" data-testid="button-google-signin">
+                    <svg className="w-4 h-4 mr-2" viewBox="0 0 24 24" aria-hidden="true">
+                      <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                      <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                      <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                      <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                    </svg>
+                    Sign in with Google
+                  </Button>
+                </a>
+              </div>
+            )}
             
             {/* Player Name Input */}
             <div className="space-y-6">
               <div>
-                <Label htmlFor="player-name">Enter Name</Label>
+                <Label htmlFor="player-name">Display Name</Label>
                 <Input
                   id="player-name"
                   type="text"
-                  placeholder="Your display name"
+                  placeholder={playerUser ? playerUser.displayName : "Sign in to play"}
                   value={playerName}
                   onChange={(e) => setPlayerName(e.target.value)}
                   className="mt-2"
+                  disabled={!playerUser}
                   data-testid="input-player-name"
                 />
+                {playerUser && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    You can customise how your name appears in this game.
+                  </p>
+                )}
               </div>
               
               {/* Game Code Input */}
@@ -335,12 +398,12 @@ export default function GameLobby() {
                       setIsGameCodeChanged(hasJoinedGame && newCode !== savedGameCode);
                     }}
                     className="flex-1"
-                    disabled={false}
+                    disabled={!playerUser}
                     data-testid="input-game-code"
                   />
                   <Button 
                     onClick={handleJoinGame} 
-                    disabled={gameLoading || (hasJoinedGame && !isGameCodeChanged) || !playerName.trim() || !gameCode.trim()} 
+                    disabled={!playerUser || gameLoading || (hasJoinedGame && !isGameCodeChanged) || !playerName.trim() || !gameCode.trim()} 
                     data-testid="button-join"
                   >
                     {gameLoading ? "Joining..." : 
@@ -505,7 +568,7 @@ export default function GameLobby() {
                           variant={session.status === 'live' ? 'destructive' : session.status === 'closed' ? 'outline' : 'secondary'}
                           size="sm"
                           onClick={() => handleJoinSession(session)}
-                          disabled={session.status === 'draft'}
+                          disabled={session.status === 'draft' || !playerUser}
                           data-testid={`button-join-session-${session.id}`}
                         >
                           {session.status === 'live' ? 'Join Live' : session.status === 'closed' ? 'View Results' : session.status === 'draft' ? 'Coming Soon' : 'Join Session'}

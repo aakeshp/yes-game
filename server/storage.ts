@@ -1,7 +1,7 @@
-import { type AdminUser, type InsertAdminUser, type Game, type InsertGame, type GameAdmin, type InsertGameAdmin, type Session, type InsertSession, type Participant, type InsertParticipant, type Submission, type InsertSubmission, type SessionPoints, type GameWithLeaderboard, type SessionResults } from "@shared/schema";
+import { type AdminUser, type InsertAdminUser, type Game, type InsertGame, type GameAdmin, type InsertGameAdmin, type PlayerUser, type Session, type InsertSession, type Participant, type InsertParticipant, type Submission, type InsertSubmission, type SessionPoints, type GameWithLeaderboard, type SessionResults } from "@shared/schema";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { adminUsers, games, gameAdmins, sessions, participants, submissions, sessionPoints } from "@shared/schema";
+import { adminUsers, games, gameAdmins, playerUsers, sessions, participants, submissions, sessionPoints } from "@shared/schema";
 import { eq, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
@@ -46,6 +46,12 @@ export interface IStorage {
   createGameAdmin(data: InsertGameAdmin): Promise<GameAdmin>;
   deleteGameAdmin(gameId: string, email: string): Promise<void>;
   isGameAdmin(gameId: string, email: string): Promise<boolean>;
+
+  // Player Users
+  upsertPlayerUser(data: { googleId: string; email: string; displayName: string }): Promise<PlayerUser>;
+  getPlayerUserById(id: string): Promise<PlayerUser | undefined>;
+  getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined>;
+  linkParticipantToPlayer(participantId: string, playerUserId: string): Promise<boolean>;
 }
 
 export class MemStorage implements IStorage {
@@ -56,6 +62,7 @@ export class MemStorage implements IStorage {
   private sessionPoints: Map<string, SessionPoints> = new Map();
   private gameCodeMap: Map<string, string> = new Map(); // code -> gameId
   private gameAdminsStore: Map<string, GameAdmin> = new Map();
+  private playerUsersStore: Map<string, PlayerUser> = new Map();
 
   // Helper to generate unique 6-digit codes
   private generateGameCode(): string {
@@ -184,6 +191,7 @@ export class MemStorage implements IStorage {
       ...insertParticipant, 
       id, 
       ownerAdminUserId: insertParticipant.ownerAdminUserId || null,
+      playerUserId: insertParticipant.playerUserId || null,
       createdAt: new Date() 
     };
     this.participants.set(id, participant);
@@ -371,6 +379,34 @@ export class MemStorage implements IStorage {
 
   async isGameAdmin(gameId: string, email: string): Promise<boolean> {
     return Array.from(this.gameAdminsStore.values()).some(ga => ga.gameId === gameId && ga.email === email);
+  }
+
+  async upsertPlayerUser(data: { googleId: string; email: string; displayName: string }): Promise<PlayerUser> {
+    const existing = Array.from(this.playerUsersStore.values()).find(p => p.googleId === data.googleId);
+    if (existing) {
+      const updated: PlayerUser = { ...existing, email: data.email, displayName: data.displayName };
+      this.playerUsersStore.set(existing.id, updated);
+      return updated;
+    }
+    const id = randomUUID();
+    const playerUser: PlayerUser = { id, googleId: data.googleId, email: data.email, displayName: data.displayName, createdAt: new Date() };
+    this.playerUsersStore.set(id, playerUser);
+    return playerUser;
+  }
+
+  async getPlayerUserById(id: string): Promise<PlayerUser | undefined> {
+    return this.playerUsersStore.get(id);
+  }
+
+  async getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined> {
+    return Array.from(this.participants.values()).find(p => p.playerUserId === playerUserId && p.gameId === gameId);
+  }
+
+  async linkParticipantToPlayer(participantId: string, playerUserId: string): Promise<boolean> {
+    const participant = this.participants.get(participantId);
+    if (!participant) return false;
+    this.participants.set(participantId, { ...participant, playerUserId });
+    return true;
   }
 }
 
@@ -770,6 +806,42 @@ export class DatabaseStorage implements IStorage {
       sql`${gameAdmins.gameId} = ${gameId} AND ${gameAdmins.email} = ${email}`
     );
     return !!ga;
+  }
+
+  async upsertPlayerUser(data: { googleId: string; email: string; displayName: string }): Promise<PlayerUser> {
+    const [existing] = await db.select().from(playerUsers).where(eq(playerUsers.googleId, data.googleId));
+    if (existing) {
+      const [updated] = await db
+        .update(playerUsers)
+        .set({ email: data.email, displayName: data.displayName })
+        .where(eq(playerUsers.googleId, data.googleId))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(playerUsers).values(data).returning();
+    return created;
+  }
+
+  async getPlayerUserById(id: string): Promise<PlayerUser | undefined> {
+    const [user] = await db.select().from(playerUsers).where(eq(playerUsers.id, id));
+    return user || undefined;
+  }
+
+  async getParticipantByPlayerAndGame(playerUserId: string, gameId: string): Promise<Participant | undefined> {
+    const [participant] = await db
+      .select()
+      .from(participants)
+      .where(sql`${participants.playerUserId} = ${playerUserId} AND ${participants.gameId} = ${gameId}`);
+    return participant || undefined;
+  }
+
+  async linkParticipantToPlayer(participantId: string, playerUserId: string): Promise<boolean> {
+    const result = await db
+      .update(participants)
+      .set({ playerUserId })
+      .where(sql`${participants.id} = ${participantId} AND ${participants.playerUserId} IS NULL`)
+      .returning();
+    return result.length > 0;
   }
 }
 
