@@ -1,4 +1,4 @@
 #!/bin/bash
 set -e
 npm install
-npm run db:push
+npx drizzle-kit push --force
