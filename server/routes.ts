@@ -413,6 +413,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // One-click play for admins/game-admins already logged in
+  app.post('/api/player/login-as-admin', async (req: any, res: any) => {
+    if (!req.user?.isAdmin) {
+      return res.status(401).json({ error: 'Not logged in as admin' });
+    }
+    try {
+      const playerUser = await storage.upsertPlayerUser({
+        googleId: req.user.id,
+        email: req.user.email,
+        displayName: req.user.name,
+      });
+      req.session.playerUser = playerUser;
+      req.session.save((err: any) => {
+        if (err) console.error('Session save error during admin-as-player login:', err);
+      });
+      res.json(playerUser);
+    } catch (err) {
+      res.status(500).json({ error: 'Failed to set up player account' });
+    }
+  });
+
   app.patch('/api/player/me', async (req: any, res: any) => {
     if (!req.session?.playerUser) {
       return res.status(401).json({ error: 'Not logged in as player' });
