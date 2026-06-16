@@ -32,7 +32,7 @@ interface Submission {
 export default function LiveSession() {
   const [location, navigate] = useLocation();
   const { toast } = useToast();
-  const { isConnected, socket, joinSession, submitVote } = useWebSocket();
+  const { isConnected, socket, joinSession, submitVote, disconnect } = useWebSocket();
   const { playerUser, isLoading: playerLoading, logout, isLoggingOut } = usePlayerAuth();
   
   const [sessionId, setSessionId] = useState<string>("");
@@ -102,6 +102,12 @@ export default function LiveSession() {
       setParticipant(data.participant);
       setSession(data.session);
       setCurrentSubmission(data.currentSubmission || {});
+      // Persist participant + game IDs for potential future backward-compat claim
+      const gameCode = new URLSearchParams(window.location.search).get("game") || "";
+      if (gameCode && data.participant?.id && data.session?.gameId) {
+        localStorage.setItem(`participantId_${gameCode}`, data.participant.id);
+        localStorage.setItem(`gameId_${gameCode}`, data.session.gameId);
+      }
       
       if (data.currentSubmission) {
         setVote(data.currentSubmission.vote || "");
@@ -230,7 +236,7 @@ export default function LiveSession() {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => logout()}
+                  onClick={() => { disconnect(); logout(); navigate("/"); }}
                   disabled={isLoggingOut}
                   title="Sign out"
                   data-testid="button-player-signout"

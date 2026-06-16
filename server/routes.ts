@@ -205,6 +205,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ws.send(JSON.stringify({ type: 'error', message: 'Not connected to a session' }));
         return;
       }
+
+      // Reject stale connections where the player has logged out
+      if (!connection.playerUser) {
+        ws.send(JSON.stringify({ type: 'error', message: 'Authentication required to submit' }));
+        return;
+      }
       
       console.log(`Vote submit: sessionId=${connection.sessionId}, participantId=${connection.participantId}, vote=${payload.vote}, guess=${payload.guessYesCount}`);
 
@@ -419,18 +425,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     const items = req.body;
     if (!Array.isArray(items)) {
-      return res.status(400).json({ error: 'Request body must be an array of { participantId, gameCode }' });
+      return res.status(400).json({ error: 'Request body must be an array of { participantId, gameId }' });
     }
     const playerUserId = req.session.playerUser.id;
     let claimed = 0;
     for (const item of items) {
-      if (!item?.participantId || !item?.gameCode) continue;
+      if (!item?.participantId || !item?.gameId) continue;
       try {
         const participant = await storage.getParticipant(item.participantId);
         if (!participant) continue;
         // Verify participant belongs to the game the client claims
-        const game = await storage.getGame(participant.gameId);
-        if (!game || game.code !== item.gameCode) continue;
+        if (participant.gameId !== item.gameId) continue;
         // Only link unclaimed participants
         if (participant.playerUserId !== null) continue;
         const linked = await storage.linkParticipantToPlayer(item.participantId, playerUserId);

@@ -43,11 +43,17 @@ export function useWebSocket() {
     gameSocket.send('session:submit', { vote, guessYesCount });
   };
 
+  const disconnect = () => {
+    gameSocket.disconnect();
+    setIsConnected(false);
+  };
+
   return {
     isConnected,
     error,
     socket: gameSocket,
     joinSession,
-    submitVote
+    submitVote,
+    disconnect,
   };
 }
