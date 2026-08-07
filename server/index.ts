@@ -7,7 +7,7 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
-import { runMigrations } from "./db";
+import { runMigrations, databaseUrl } from "./db";
 
 const app = express();
 app.set('trust proxy', 1); // Trust first proxy for secure cookies behind a reverse proxy/load balancer
@@ -23,7 +23,7 @@ const PgSession = connectPgSimple(session);
 
 const sessionMiddleware = session({
   store: new PgSession({
-    conString: process.env.DATABASE_URL,
+    conString: databaseUrl,
     tableName: 'user_sessions',
     createTableIfMissing: true
   }),

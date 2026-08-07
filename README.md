@@ -51,8 +51,12 @@ A real-time multiplayer voting and guessing game platform where participants vot
 4. **Set up environment variables**
    Create a `.env` file with:
    ```env
-   DATABASE_URL=your_postgresql_connection_string
-   
+   # Development database (used when NODE_ENV !== 'production')
+   DATABASE_URL=your_dev_postgresql_connection_string
+
+   # Production database (used when NODE_ENV === 'production')
+   DATABASE_URL_PROD=your_prod_postgresql_connection_string
+
    # Development OAuth credentials
    GOOGLE_CLIENT_ID=your_dev_google_oauth_client_id
    GOOGLE_CLIENT_SECRET=your_dev_google_oauth_client_secret
@@ -189,7 +193,7 @@ This app can be deployed on any Node.js hosting platform that runs a persistent 
 1. **Set up production Google OAuth app** (see OAuth Setup section above) and register its redirect URI against your production domain.
 2. **Set production environment variables** on your host:
    ```
-   DATABASE_URL=your_postgresql_connection_string
+   DATABASE_URL_PROD=your_prod_postgresql_connection_string
    GOOGLE_CLIENT_ID_PROD=your_prod_client_id
    GOOGLE_CLIENT_SECRET_PROD=your_prod_client_secret
    PRODUCTION_DOMAIN=your-custom-domain.com
@@ -224,7 +228,7 @@ A `Dockerfile` is included if your host accepts container images — see the "Do
 ```bash
 docker build -t yes-game .
 docker run -p 5000:5000 \
-  -e DATABASE_URL=... \
+  -e DATABASE_URL_PROD=... \
   -e SESSION_SECRET=... \
   -e ADMIN_EMAILS=... \
   -e PRODUCTION_DOMAIN=... \
