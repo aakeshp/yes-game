@@ -31,7 +31,7 @@ A real-time multiplayer voting and guessing game platform where participants vot
 
 ### Prerequisites
 - Node.js 18+ installed
-- PostgreSQL database (or use Replit's built-in database)
+- PostgreSQL database (e.g. [Neon](https://neon.tech))
 
 ### Installation
 
@@ -51,11 +51,19 @@ A real-time multiplayer voting and guessing game platform where participants vot
 4. **Set up environment variables**
    Create a `.env` file with:
    ```env
-   DATABASE_URL=your_postgresql_connection_string
-   
+   # Development database (used when NODE_ENV !== 'production')
+   DATABASE_URL=your_dev_postgresql_connection_string
+
+   # Production database (used when NODE_ENV === 'production')
+   DATABASE_URL_PROD=your_prod_postgresql_connection_string
+
    # Development OAuth credentials
    GOOGLE_CLIENT_ID=your_dev_google_oauth_client_id
    GOOGLE_CLIENT_SECRET=your_dev_google_oauth_client_secret
+
+   # Optional: dev OAuth callback domain (defaults to localhost:5000).
+   # Set this if you're testing OAuth through a tunnel, e.g. ngrok.
+   # DEV_DOMAIN=your-tunnel-domain.ngrok-free.app
    
    # Production OAuth credentials (for deployment)
    GOOGLE_CLIENT_ID_PROD=your_prod_google_oauth_client_id
@@ -143,7 +151,6 @@ Refer to [Google Cloud Console](https://console.cloud.google.com/) to create OAu
 - `npm run dev` - Start development server
 - `npm run build` - Build for production
 - `npm run db:push` - Push database schema changes
-- `npm run db:studio` - Open Drizzle Studio for database management
 
 ### Project Structure
 ```
@@ -181,42 +188,54 @@ Contributions are welcome! Please feel free to submit a Pull Request. For major 
 ## 🚀 Deployment Options
 
 ### General Deployment
-This app can be deployed on any Node.js hosting platform:
-- Set production environment variables (see environment setup above)
-- Configure PostgreSQL database
-- Set up custom domain with HTTPS
-- Ensure WebSocket support for real-time features
+This app can be deployed on any Node.js hosting platform that runs a persistent process (not pure serverless — the WebSocket server shares the same HTTP port as the API):
 
-### Replit Deployment (Recommended)
-1. **Set up production Google OAuth app** (see OAuth Setup section above)
-
-2. **Configure Replit Secrets** with production environment variables:
+1. **Set up production Google OAuth app** (see OAuth Setup section above) and register its redirect URI against your production domain.
+2. **Set production environment variables** on your host:
    ```
+   DATABASE_URL_PROD=your_prod_postgresql_connection_string
    GOOGLE_CLIENT_ID_PROD=your_prod_client_id
    GOOGLE_CLIENT_SECRET_PROD=your_prod_client_secret
    PRODUCTION_DOMAIN=your-custom-domain.com
    ADMIN_EMAILS=admin1@example.com,admin2@example.com
    SESSION_SECRET=your_secure_session_secret
-   DATABASE_URL=(automatically provided by Replit)
+   NODE_ENV=production
+   PORT=5000
    ```
+3. **Build and run**:
+   ```bash
+   npm ci
+   npm run build
+   npm run start
+   ```
+4. **Ensure your host/reverse proxy allows WebSocket upgrades** on the same port and path (`/game-ws`) as the HTTP server — most modern PaaS providers (Render, Railway, Fly.io, etc.) and standard reverse proxies (Nginx, Caddy) support this out of the box.
 
-3. **Deploy using Replit's deployment system**:
-   - Click "Deploy" in your Replit workspace
-   - Choose "Autoscale Deployment" for optimal performance
-   - Your app will be live with automatic HTTPS and scaling
+A `Dockerfile` is included if your host accepts container images — see the "Docker" section below.
 
 ### Production Features
 - ✅ **PostgreSQL session storage** scales automatically
-- ✅ **Trust proxy configuration** for secure cookies behind Replit's infrastructure  
+- ✅ **Trust proxy configuration** for secure cookies behind a reverse proxy/load balancer
 - ✅ **Environment-specific OAuth** prevents dev credentials in production
 - ✅ **WebSocket support** for real-time features
-- ✅ **Automatic TLS certificates** and domain management
 
 ### Custom Domain Setup
-1. In Replit Deployments, configure your custom domain
-2. Update `PRODUCTION_DOMAIN` secret to match your domain
-3. Update your Google OAuth production app redirect URI
-4. Deploy - your app will automatically handle the environment switch
+1. Point your custom domain at your host and set up TLS (most hosts automate this).
+2. Update `PRODUCTION_DOMAIN` to match your domain.
+3. Update your Google OAuth production app redirect URI to match.
+4. Redeploy.
+
+### Docker
+```bash
+docker build -t yes-game .
+docker run -p 5000:5000 \
+  -e DATABASE_URL_PROD=... \
+  -e SESSION_SECRET=... \
+  -e ADMIN_EMAILS=... \
+  -e PRODUCTION_DOMAIN=... \
+  -e GOOGLE_CLIENT_ID_PROD=... \
+  -e GOOGLE_CLIENT_SECRET_PROD=... \
+  yes-game
+```
 
 ---
 

@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
@@ -6,23 +7,23 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { storage } from "./storage";
-import { runMigrations } from "./db";
+import { runMigrations, databaseUrl } from "./db";
 
 const app = express();
-app.set('trust proxy', 1); // Trust first proxy for secure cookies behind Replit proxy
+app.set('trust proxy', 1); // Trust first proxy for secure cookies behind a reverse proxy/load balancer
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
-// Session configuration - isolated from Replit platform
+// Session configuration
 // Use same production detection as OAuth config
-const isProduction = process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1';
+const isProduction = process.env.NODE_ENV === 'production';
 
 // PostgreSQL session store for production reliability
 const PgSession = connectPgSimple(session);
 
 const sessionMiddleware = session({
   store: new PgSession({
-    conString: process.env.DATABASE_URL,
+    conString: databaseUrl,
     tableName: 'user_sessions',
     createTableIfMissing: true
   }),
@@ -35,7 +36,7 @@ const sessionMiddleware = session({
     httpOnly: true,
     sameSite: isProduction ? 'none' : 'lax',
     // NO domain setting - defaults to exact hostname only
-    // This prevents interference with Replit platform cookies
+    // This avoids interference from other apps' cookies on shared hosting platforms
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 });
@@ -50,7 +51,7 @@ app.use(passport.session());
 
 // Google OAuth Strategy with environment-specific configuration
 const getOAuthConfig = () => {
-  if (process.env.NODE_ENV === 'production' || process.env.REPLIT_DEPLOYMENT === '1') {
+  if (process.env.NODE_ENV === 'production') {
     // Production: Use configurable domain and production-specific credentials
     const productionDomain = process.env.PRODUCTION_DOMAIN;
     const clientID = process.env.GOOGLE_CLIENT_ID_PROD;
@@ -72,25 +73,23 @@ const getOAuthConfig = () => {
       playerCallbackURL: `https://${productionDomain}/auth/google/player/callback`
     };
   } else {
-    // Development: Use Replit's dev domain and main credentials (GOOGLE_CLIENT_ID/SECRET are for dev)
-    const devDomain = process.env.REPLIT_DEV_DOMAIN;
+    // Development: Use a configurable dev domain (defaults to localhost) and main credentials (GOOGLE_CLIENT_ID/SECRET are for dev)
+    const devDomain = process.env.DEV_DOMAIN || `localhost:${process.env.PORT || '5000'}`;
+    const isLocalDevDomain = devDomain.startsWith('localhost') || devDomain.startsWith('127.0.0.1');
+    const devProtocol = isLocalDevDomain ? 'http' : 'https';
     const clientID = process.env.GOOGLE_CLIENT_ID;
     const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    
-    if (!devDomain) {
-      console.error('❌ OAuth Setup - REPLIT_DEV_DOMAIN not available in development');
-      throw new Error('REPLIT_DEV_DOMAIN not available in development');
-    }
+
     if (!clientID || !clientSecret) {
       console.error('❌ OAuth Setup - GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required for development');
       throw new Error('GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET required for development');
     }
-    
+
     return {
       clientID: clientID,
       clientSecret: clientSecret,
-      adminCallbackURL: `https://${devDomain}/auth/google/callback`,
-      playerCallbackURL: `https://${devDomain}/auth/google/player/callback`
+      adminCallbackURL: `${devProtocol}://${devDomain}/auth/google/callback`,
+      playerCallbackURL: `${devProtocol}://${devDomain}/auth/google/player/callback`
     };
   }
 };
@@ -244,15 +243,12 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Serve the app on the port specified in the environment variable PORT,
+  // defaulting to 5000. This serves both the API and the client.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, () => {
     log(`serving on port ${port}`);
   });

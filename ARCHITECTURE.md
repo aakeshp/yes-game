@@ -44,7 +44,7 @@ The application follows a monorepo structure with separate client and server dir
 **Authentication & Authorization:**
 - **Production-grade session management**: PostgreSQL-backed sessions with connect-pg-simple
 - **Dual-environment OAuth**: Separate Google OAuth credentials for dev/prod security isolation
-- **Trust proxy configuration**: Secure cookie handling behind Replit's proxy infrastructure
+- **Trust proxy configuration**: Secure cookie handling behind a reverse proxy/load balancer
 - **Participant identification**: localStorage-stored participant IDs with game-scoped management
 - **Session security**: Unique session names and proper cookie isolation from platform
 
@@ -100,7 +100,6 @@ The application follows a monorepo structure with separate client and server dir
 ## Development Tools
 - **ESBuild**: Fast bundling for production server builds
 - **TSX**: TypeScript execution for development server
-- **Replit Integration**: Development environment integration and error handling
 
 ## Real-time Communication
 - **Native WebSocket API**: Real-time bidirectional communication for live sessions
