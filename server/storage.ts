@@ -865,6 +865,53 @@ export class DatabaseStorage implements IStorage {
     return participant || undefined;
   }
 
+  // Admin search for signed-in players by name. Returns only id and display name (no emails).
+  async searchPlayerUsers(query: string, limit: number): Promise<Array<{ id: string; displayName: string }>> {
+    const pattern = `%${query.replace(/[%_\\]/g, (c) => `\\${c}`)}%`;
+    return await db
+      .select({ id: playerUsers.id, displayName: playerUsers.displayName })
+      .from(playerUsers)
+      .where(sql`${playerUsers.displayName} ILIKE ${pattern}`)
+      .orderBy(playerUsers.displayName)
+      .limit(limit);
+  }
+
+  // The player's most recently played games (at least one finished question), with their total and rank.
+  // Rank uses the same rules as the game leaderboard: highest total first, ties share a rank.
+  async getRecentGamesForPlayer(playerUserId: string, limit: number): Promise<Array<{
+    gameId: string; name: string; status: string; totalPoints: number; sessionsPlayed: number;
+    rank: number; playerCount: number; lastPlayedAt: string | null;
+  }>> {
+    const result = await db.execute(sql`
+      with totals as (
+        select p.game_id, p.player_user_id, sum(sp.points) as total, count(*) as played, max(s.ended_at) as last_played
+        from ${participants} p
+        join ${sessionPoints} sp on sp.participant_id = p.id
+        join ${sessions} s on s.id = sp.session_id and s.status = 'closed'
+        group by p.game_id, p.id, p.player_user_id
+      ), ranked as (
+        select *, rank() over (partition by game_id order by total desc) as rnk,
+               count(*) over (partition by game_id) as players
+        from totals
+      )
+      select g.id as game_id, g.name, g.status, r.total, r.played, r.rnk, r.players, r.last_played
+      from ranked r join ${games} g on g.id = r.game_id
+      where r.player_user_id = ${playerUserId}
+      order by r.last_played desc nulls last
+      limit ${limit}
+    `);
+    return (result.rows as any[]).map((r) => ({
+      gameId: r.game_id,
+      name: r.name,
+      status: r.status,
+      totalPoints: Number(r.total),
+      sessionsPlayed: Number(r.played),
+      rank: Number(r.rnk),
+      playerCount: Number(r.players),
+      lastPlayedAt: r.last_played ? new Date(r.last_played).toISOString() : null,
+    }));
+  }
+
   async linkParticipantToPlayer(participantId: string, playerUserId: string): Promise<boolean> {
     const result = await db
       .update(participants)

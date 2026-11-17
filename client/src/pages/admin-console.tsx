@@ -10,7 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock, ArrowLeft, UserPlus, Trash2, Shield } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Settings, Play, ExternalLink, Copy, Users, Edit2, Lock, ArrowLeft, UserPlus, Trash2, Shield, Flag, RotateCcw } from "lucide-react";
 
 interface Session {
   id: string;
@@ -266,6 +277,31 @@ export default function AdminConsole() {
     }
   });
 
+  const setGameEndedMutation = useMutation({
+    mutationFn: async (ended: boolean) => {
+      const response = await apiRequest("POST", `/api/games/${gameId}/${ended ? "end" : "reopen"}`);
+      return response.json();
+    },
+    onSuccess: (_data, ended) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/games", gameId] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/games"] });
+      toast({
+        title: ended ? "Game ended" : "Game reopened",
+        description: ended
+          ? "Players opening this game will be asked to enter the new game code."
+          : "Players can join this game again.",
+      });
+    },
+    onError: (error: any) => {
+      let description = "Failed to update the game";
+      try {
+        const match = error?.message?.match(/^\d+: ([\s\S]*)/);
+        if (match) description = JSON.parse(match[1]).error || description;
+      } catch {}
+      toast({ title: "Error", description, variant: "destructive" });
+    }
+  });
+
   const addGameAdminMutation = useMutation({
     mutationFn: async (email: string) => {
       const response = await apiRequest("POST", `/api/admin/games/${gameId}/admins`, { email });
@@ -378,6 +414,9 @@ export default function AdminConsole() {
     }
   }, [selectedSessionId, draftSessions]);
   const hasLiveSession = sessions?.some((s: Session) => s.status === 'live');
+  const isGameEnded = game?.status === 'archived';
+  const activeGames = adminGames?.filter((g) => g.status !== 'archived') || [];
+  const endedGames = adminGames?.filter((g) => g.status === 'archived') || [];
 
   // Show game selection when no specific game is selected
   if (!gameId) {
@@ -481,10 +520,15 @@ export default function AdminConsole() {
 
                 {/* Existing Games List */}
                 {adminGames && adminGames.length > 0 ? (
-                  <div>
-                    <h3 className="font-medium mb-3">Your Games</h3>
+                  <div className="space-y-6">
+                  {[
+                    { title: "Your Games", list: activeGames },
+                    { title: "Ended Games", list: endedGames },
+                  ].filter((group) => group.list.length > 0).map((group) => (
+                  <div key={group.title}>
+                    <h3 className="font-medium mb-3">{group.title}</h3>
                     <div className="space-y-3">
-                      {adminGames.map((adminGame) => (
+                      {group.list.map((adminGame) => (
                         <div 
                           key={adminGame.id}
                           className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
@@ -493,7 +537,10 @@ export default function AdminConsole() {
                         >
                           <div className="flex items-center justify-between">
                             <div>
-                              <h3 className="font-medium">{adminGame.name}</h3>
+                              <h4 className="font-medium flex items-center gap-2">
+                                {adminGame.name}
+                                {adminGame.status === 'archived' && <Badge variant="outline">Ended</Badge>}
+                              </h4>
                               <p className="text-sm text-muted-foreground">Code: {adminGame.code}</p>
                             </div>
                             <Button variant="outline" size="sm">
@@ -503,6 +550,8 @@ export default function AdminConsole() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                  ))}
                   </div>
                 ) : (
                   <div className="text-center py-8">
@@ -579,6 +628,29 @@ export default function AdminConsole() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Ended game banner */}
+        {isGameEnded && (
+          <Card className="border border-border bg-muted mb-6" role="status">
+            <CardContent className="p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <p className="font-semibold text-foreground">This game has ended</p>
+                <p className="text-sm text-muted-foreground">
+                  Players can't join its questions and the lobby asks them for the new game code. Results, leaderboard and export still work.
+                </p>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setGameEndedMutation.mutate(false)}
+                disabled={setGameEndedMutation.isPending}
+                data-testid="button-reopen-game"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" aria-hidden="true" />
+                {setGameEndedMutation.isPending ? "Reopening..." : "Reopen Game"}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Game Settings Card */}
         <Card className="shadow-lg border border-border mb-6">
           <CardContent className="p-6">
@@ -683,6 +755,38 @@ export default function AdminConsole() {
                   >
                     📊 Export Results
                   </Button>
+                  {!isGameEnded && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full"
+                          disabled={hasLiveSession || setGameEndedMutation.isPending}
+                          data-testid="button-end-game"
+                        >
+                          <Flag className="w-4 h-4 mr-2" aria-hidden="true" />
+                          End Game
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>End {game.name}?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Players won't be able to join its questions. Anyone whose lobby still opens this game will see that it has ended and be asked for the new game code. Results, the leaderboard and export stay available, and you can reopen the game later.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => setGameEndedMutation.mutate(true)} data-testid="button-confirm-end-game">
+                            End Game
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                  {!isGameEnded && hasLiveSession && (
+                    <p className="text-xs text-muted-foreground">You can end the game once the live question has finished.</p>
+                  )}
                 </div>
               </div>
             </div>
@@ -800,7 +904,7 @@ export default function AdminConsole() {
                 </div>
                 <Button 
                   onClick={handleCreateSession}
-                  disabled={createSessionMutation.isPending || !newQuestion.trim()}
+                  disabled={isGameEnded || createSessionMutation.isPending || !newQuestion.trim()}
                   className="w-full bg-secondary text-secondary-foreground hover:bg-secondary/90"
                   data-testid="button-create-session"
                 >
@@ -819,7 +923,7 @@ export default function AdminConsole() {
                   <div className="flex space-x-3">
                     <Button
                       onClick={() => selectedSession && handleStartSession(selectedSession.id)}
-                      disabled={!selectedSession || startSessionMutation.isPending}
+                      disabled={isGameEnded || !selectedSession || startSessionMutation.isPending}
                       className="bg-primary text-primary-foreground hover:bg-primary/90"
                       data-testid="button-start-session"
                     >

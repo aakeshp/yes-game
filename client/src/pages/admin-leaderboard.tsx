@@ -8,7 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Trophy, Medal, Award, ChevronDown, ChevronRight, Eye, Pencil } from "lucide-react";
+import { ArrowLeft, Trophy, Medal, Award, ChevronDown, ChevronRight, Eye, Pencil, UserPlus } from "lucide-react";
+import AddMissingAnswerDialog from "@/components/AddMissingAnswerDialog";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -18,6 +19,7 @@ interface GameWithDetailedLeaderboard {
   code: string;
   leaderboard: Array<{
     participantId: string;
+    playerUserId: string | null;
     displayName: string;
     totalPoints: number;
     sessionsPlayed: number;
@@ -47,6 +49,7 @@ export default function AdminLeaderboard() {
   const [gameId, setGameId] = useState<string>("");
   const [expandedParticipants, setExpandedParticipants] = useState<Set<string>>(new Set());
   const [editState, setEditState] = useState<EditState | null>(null);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -151,6 +154,12 @@ export default function AdminLeaderboard() {
     );
   }
 
+  // Which questions each signed-in player has already answered, so the add form can block duplicates
+  const answeredByPlayer = new Map<string, Set<string>>();
+  for (const p of gameData.leaderboard) {
+    if (p.playerUserId) answeredByPlayer.set(p.playerUserId, new Set(p.sessionBreakdown.map((s) => s.sessionId)));
+  }
+
   const getRankIcon = (position: number) => {
     switch (position) {
       case 1:
@@ -209,10 +218,16 @@ export default function AdminLeaderboard() {
         {/* Leaderboard */}
         <Card className="shadow-lg border border-border">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <Trophy className="w-6 h-6 mr-2 text-primary" />
-              Detailed Leaderboard
-            </CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <CardTitle className="flex items-center">
+                <Trophy className="w-6 h-6 mr-2 text-primary" />
+                Detailed Leaderboard
+              </CardTitle>
+              <Button variant="outline" size="sm" onClick={() => setIsAddOpen(true)} data-testid="button-add-missing-answer">
+                <UserPlus className="w-4 h-4 mr-2" aria-hidden="true" />
+                Add missing answer
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             {gameData.leaderboard.length === 0 ? (
@@ -349,6 +364,13 @@ export default function AdminLeaderboard() {
           </CardContent>
         </Card>
       </div>
+
+      <AddMissingAnswerDialog
+        gameId={gameId}
+        open={isAddOpen}
+        onOpenChange={setIsAddOpen}
+        answeredByPlayer={answeredByPlayer}
+      />
 
       {/* Edit Submission Dialog */}
       <Dialog open={!!editState} onOpenChange={(open) => { if (!open) setEditState(null); }}>
