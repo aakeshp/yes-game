@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { usePlayerAuth } from "@/hooks/use-player-auth";
+import PreviousGames from "@/components/PreviousGames";
 import { ChevronDown, ChevronUp, LogOut, Pencil, Check, X } from "lucide-react";
 
 interface Session {
@@ -68,6 +69,8 @@ export default function GameLobby() {
   const [hasJoinedGame, setHasJoinedGame] = useState(false);
   const [isGameCodeChanged, setIsGameCodeChanged] = useState(false);
   const [claimedThisSession, setClaimedThisSession] = useState(false);
+  // Name of a game the player tried to open that has since been ended by an admin
+  const [endedGameName, setEndedGameName] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editingNameValue, setEditingNameValue] = useState("");
   const [isLeaderboardCollapsed, setIsLeaderboardCollapsed] = useState(() => {
@@ -173,9 +176,20 @@ export default function GameLobby() {
   });
 
   useEffect(() => {
-    if (game) {
-      setCurrentGameId(game.id);
+    if (!game) return;
+    if (game.status === "archived") {
+      // The remembered (or typed) game has ended: forget it so the player enters the new code
+      localStorage.removeItem("currentGameCode");
+      localStorage.removeItem(`participantId_${game.code}`);
+      setEndedGameName(game.name);
+      setGameCode("");
+      setHasJoinedGame(false);
+      setIsGameCodeChanged(false);
+      setCurrentGameId(null);
+      return;
     }
+    setEndedGameName(null);
+    setCurrentGameId(game.id);
   }, [game]);
 
   // Listen for session completion events to refresh leaderboard
@@ -186,6 +200,7 @@ export default function GameLobby() {
       if (data?.gameId !== currentGameId) return;
       queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "leaderboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/games", currentGameId, "sessions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/player/recent-games"] });
     };
 
     const handleLeaderboardUpdated = (data: any) => {
@@ -220,6 +235,7 @@ export default function GameLobby() {
 
     try {
       localStorage.setItem("playerName", playerName);
+      setEndedGameName(null);
       
       if (isGameCodeChanged) {
         const oldGameCode = localStorage.getItem("currentGameCode");
@@ -511,6 +527,18 @@ export default function GameLobby() {
                 )}
               </div>
               
+              {/* Shown when the remembered game has been ended by an admin */}
+              <div role="status" aria-live="polite" className={endedGameName ? undefined : "sr-only"}>
+                {endedGameName && (
+                  <div className="p-4 bg-muted border border-border rounded-lg" data-testid="text-game-ended">
+                    <p className="font-semibold text-foreground">{endedGameName} has ended</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Thanks for playing! Enter the new game code below to keep playing.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Game Code Input */}
               <div>
                 <Label htmlFor="game-code">Join Game Code</Label>
@@ -733,6 +761,9 @@ export default function GameLobby() {
                 <p className="text-muted-foreground">No sessions available yet. Check back later or contact the game admin.</p>
               </div>
             )}
+
+            {/* Recent games the player took part in, so finished games' leaderboards stay reachable */}
+            {playerUser && <PreviousGames currentGameId={currentGameId} playerUserId={playerUser.id} />}
           </CardContent>
         </Card>
       </main>

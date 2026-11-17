@@ -53,43 +53,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
   wss.on('connection', (ws, req) => {
     // Apply session middleware to read the session from the upgrade request cookie,
     // so we can derive player identity server-side instead of trusting client payloads.
+    // The session lookup is async (it hits the database). Listeners are attached straight away and
+    // incoming messages wait for the lookup to finish; otherwise a message the browser sends the moment
+    // the socket opens (e.g. session:join) arrives before any listener exists and is silently lost.
     const sessionMiddleware = app.locals.sessionMiddleware;
-    sessionMiddleware(req as any, {} as any, () => {
-      const playerUser: PlayerUser | null = (req as any).session?.playerUser ?? null;
-      const wsSessionId: string | undefined = (req as any).sessionID;
-      connections.set(ws, { ws, playerUser, wsSessionId });
+    const sessionReady = new Promise<void>((resolve) => {
+      sessionMiddleware(req as any, {} as any, () => {
+        const playerUser: PlayerUser | null = (req as any).session?.playerUser ?? null;
+        const wsSessionId: string | undefined = (req as any).sessionID;
+        connections.set(ws, { ws, playerUser, wsSessionId });
 
-      // Send connection confirmation
-      ws.send(JSON.stringify({ type: 'connection:ready' }));
-
-      ws.on('message', async (message) => {
-        try {
-          const data = JSON.parse(message.toString());
-          await handleWebSocketMessage(ws, data);
-        } catch (error) {
-          console.error('WebSocket message error:', error);
-          ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+        // Send connection confirmation
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'connection:ready' }));
         }
+        resolve();
       });
+    });
 
-      ws.on('close', () => {
-        const connection = connections.get(ws);
-        if (connection?.sessionId) {
-          const room = sessionRooms.get(connection.sessionId);
-          room?.delete(ws);
-        }
-        connections.delete(ws);
-        console.log('WebSocket connection closed');
-      });
+    ws.on('message', async (message) => {
+      await sessionReady;
+      try {
+        const data = JSON.parse(message.toString());
+        await handleWebSocketMessage(ws, data);
+      } catch (error) {
+        console.error('WebSocket message error:', error);
+        ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
+      }
+    });
 
-      ws.on('error', (error) => {
-        console.error('WebSocket connection error:', error);
-      });
+    ws.on('close', async () => {
+      await sessionReady;
+      const connection = connections.get(ws);
+      if (connection?.sessionId) {
+        const room = sessionRooms.get(connection.sessionId);
+        room?.delete(ws);
+      }
+      connections.delete(ws);
+      console.log('WebSocket connection closed');
+    });
 
-      // Keep connection alive with ping/pong
-      ws.on('pong', () => {
-        // Connection is alive
-      });
+    ws.on('error', (error) => {
+      console.error('WebSocket connection error:', error);
+    });
+
+    // Keep connection alive with ping/pong
+    ws.on('pong', () => {
+      // Connection is alive
     });
   });
 
@@ -116,9 +126,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const connection = connections.get(ws);
       if (!connection) return;
 
+      // Every join attempt is logged with its outcome (IDs only, no names or emails)
+      // so it's possible to tell afterwards why a player missed a question.
+      const playerId = connection.playerUser?.id ?? 'none';
+      const refuseJoin = (reason: string, message: string) => {
+        console.log(`Join refused: session=${sessionId} player=${playerId} reason=${reason}`);
+        ws.send(JSON.stringify({ type: 'error', context: 'join', reason, message }));
+      };
+      console.log(`Join attempt: session=${sessionId} player=${playerId}`);
+
       // Require authenticated player identity derived from server-side session
       if (!connection.playerUser) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Sign in with Google is required to join a session.' }));
+        refuseJoin('not_signed_in', 'Sign in with Google is required to join a session.');
         return;
       }
 
@@ -126,12 +145,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const session = await storage.getSession(sessionId);
       if (!session) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Session not found' }));
+        refuseJoin('session_not_found', 'This question could not be found.');
         return;
       }
 
-      // Find or create participant linked to this authenticated player
+      const sessionGame = await storage.getGame(session.gameId);
+      if (sessionGame?.status === 'archived') {
+        refuseJoin('game_ended', 'This game has ended. Enter the new game code in the lobby.');
+        return;
+      }
+
+      // Look up the player's record for this game, but only create one once the join is allowed
       let participant = await storage.getParticipantByPlayerAndGame(playerUser.id, session.gameId);
+
+      // Check if this is an existing participant with a submission
+      const existingSubmission = participant ? await storage.getSubmission(sessionId, participant.id) : undefined;
+      const isExistingParticipant = !!existingSubmission;
+
+      // Apply 10-second join cutoff only to NEW participants, not existing ones
+      if (session.status === 'live' && session.endsAt && !isExistingParticipant) {
+        const timeRemaining = session.endsAt.getTime() - Date.now();
+        if (timeRemaining < 10000) { // 10 seconds
+          refuseJoin('too_late', 'This question is about to end, so joining has closed. You can join the next one.');
+          return;
+        }
+      }
+
       if (!participant) {
         participant = await storage.createParticipant({
           gameId: session.gameId,
@@ -146,22 +185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       if (!participant) {
-        ws.send(JSON.stringify({ type: 'error', message: 'Unable to create or find participant' }));
+        refuseJoin('participant_error', 'Something went wrong joining this question. Please try again.');
         return;
       }
 
-      // Check if this is an existing participant with a submission
-      const existingSubmission = await storage.getSubmission(sessionId, participant.id);
-      const isExistingParticipant = !!existingSubmission;
-
-      // Apply 10-second join cutoff only to NEW participants, not existing ones
-      if (session.status === 'live' && session.endsAt && !isExistingParticipant) {
-        const timeRemaining = session.endsAt.getTime() - Date.now();
-        if (timeRemaining < 10000) { // 10 seconds
-          ws.send(JSON.stringify({ type: 'error', message: 'Joining closed - less than 10 seconds remaining' }));
-          return;
-        }
-      }
+      console.log(`Join accepted: session=${sessionId} player=${playerId} participant=${participant.id} status=${session.status}`);
 
       // Update connection
       connection.sessionId = sessionId;
@@ -195,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     } catch (error) {
       console.error('Session join error:', error);
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to join session' }));
+      ws.send(JSON.stringify({ type: 'error', context: 'join', reason: 'server_error', message: 'Something went wrong joining this question. Please try again.' }));
     }
   }
 
@@ -474,6 +502,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // The signed-in player's recent games, so finished games' leaderboards stay reachable from the lobby.
+  // Returns 4 so the lobby can leave out the game the player is currently in and still show 3.
+  app.get('/api/player/recent-games', async (req: any, res: any) => {
+    if (!req.session?.playerUser) {
+      return res.status(401).json({ error: 'Not logged in as player' });
+    }
+    try {
+      const recentGames = await storage.getRecentGamesForPlayer(req.session.playerUser.id, 4);
+      res.json(recentGames);
+    } catch (error) {
+      console.error('Recent games error:', error);
+      res.status(500).json({ error: 'Failed to fetch recent games' });
+    }
+  });
+
   app.post('/api/player/claim-participants', async (req: any, res: any) => {
     if (!req.session?.playerUser) {
       return res.status(401).json({ error: 'Not logged in as player' });
@@ -636,8 +679,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return;
       }
 
-      // Parse and validate update data
-      const updateData = insertGameSchema.partial().parse(req.body);
+      // Only the name can be changed here. Ending/reopening a game uses the dedicated endpoints below.
+      const updateData = insertGameSchema.pick({ name: true }).partial().parse(req.body);
       const updatedGame = await storage.updateGame(req.params.gameId, updateData);
       
       if (!updatedGame) {
@@ -838,6 +881,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         leaderboard.push({
           participantId: participant.id,
+          playerUserId: participant.playerUserId ?? null,
           displayName: participant.displayName,
           totalPoints,
           sessionsPlayed,
@@ -909,6 +953,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ error: 'Failed to update submission' });
+    }
+  });
+
+  // --- Backfilling a missing answer (e.g. a player whose join never reached the server) ---
+
+  // Finished questions in a game with their current Yes count, for the "Add missing answer" form
+  app.get('/api/admin/games/:gameId/closed-sessions', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
+    try {
+      const gameSessions = await storage.getSessionsByGameId(req.params.gameId);
+      const closed = gameSessions
+        .filter(s => s.status === 'closed')
+        .sort((a, b) => (a.startedAt?.getTime() ?? 0) - (b.startedAt?.getTime() ?? 0));
+      const result = [];
+      for (const s of closed) {
+        const subs = await storage.getSubmissionsBySessionId(s.id);
+        result.push({ id: s.id, question: s.question, yesCount: subs.filter(x => x.vote === 'YES').length });
+      }
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to fetch questions' });
+    }
+  });
+
+  // Search signed-in players by name (names only, no emails)
+  app.get('/api/admin/games/:gameId/player-search', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
+    try {
+      const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+      if (q.length < 2) {
+        res.json([]);
+        return;
+      }
+      res.json(await storage.searchPlayerUsers(q, 10));
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to search players' });
+    }
+  });
+
+  // Add an answer for a player who has none for a finished question, then recalculate that question's points
+  app.post('/api/admin/sessions/:sessionId/submissions', makeGameAccessMiddleware(async (req) => {
+    const session = await storage.getSession(req.params.sessionId);
+    return session?.gameId || '';
+  }), async (req: any, res) => {
+    try {
+      const { sessionId } = req.params;
+      const { playerUserId, vote, guessYesCount } = req.body || {};
+
+      if (!playerUserId || typeof playerUserId !== 'string') {
+        res.status(400).json({ error: 'Choose a player' });
+        return;
+      }
+      if (!vote || !['YES', 'NO'].includes(vote)) {
+        res.status(400).json({ error: 'vote must be "YES" or "NO"' });
+        return;
+      }
+      if (typeof guessYesCount !== 'number' || !Number.isInteger(guessYesCount) || guessYesCount < 0) {
+        res.status(400).json({ error: 'guessYesCount must be a non-negative integer' });
+        return;
+      }
+
+      const session = await storage.getSession(sessionId);
+      if (!session) {
+        res.status(404).json({ error: 'Question not found' });
+        return;
+      }
+      if (session.status !== 'closed') {
+        res.status(400).json({ error: 'Answers can only be added to finished questions' });
+        return;
+      }
+
+      const playerUser = await storage.getPlayerUserById(playerUserId);
+      if (!playerUser) {
+        res.status(404).json({ error: 'Player not found' });
+        return;
+      }
+
+      let participant = await storage.getParticipantByPlayerAndGame(playerUser.id, session.gameId);
+      if (participant && await storage.getSubmission(sessionId, participant.id)) {
+        res.status(409).json({ error: 'This player already has an answer for this question. Edit it from their row instead.' });
+        return;
+      }
+      if (!participant) {
+        participant = await storage.createParticipant({
+          gameId: session.gameId,
+          displayName: playerUser.displayName,
+          ownerAdminUserId: null,
+          playerUserId: playerUser.id
+        });
+      }
+
+      await storage.upsertSubmission({ sessionId, participantId: participant.id, vote, guessYesCount });
+      await storage.recalculateSessionPoints(sessionId);
+      console.log(`Answer backfilled: session=${sessionId} participant=${participant.id} by admin`);
+
+      broadcastToAll({
+        type: 'leaderboard:updated',
+        payload: { gameId: session.gameId }
+      });
+
+      res.json({ success: true, participantId: participant.id });
+    } catch (error) {
+      console.error('Backfill answer error:', error);
+      res.status(500).json({ error: 'Failed to add answer' });
     }
   });
 
@@ -999,6 +1145,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // End a game: players can no longer join its questions, and the lobby tells them it has ended.
+  // Results, leaderboard and export stay available.
+  app.post('/api/games/:gameId/end', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
+    try {
+      const game = await storage.getGame(req.params.gameId);
+      if (!game) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+      const gameSessions = await storage.getSessionsByGameId(req.params.gameId);
+      if (gameSessions.some(s => s.status === 'live')) {
+        res.status(400).json({ error: 'A question is live. Wait for it to finish before ending the game.' });
+        return;
+      }
+      const updatedGame = await storage.updateGame(req.params.gameId, { status: 'archived' });
+      res.json(updatedGame);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to end game' });
+    }
+  });
+
+  app.post('/api/games/:gameId/reopen', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
+    try {
+      const updatedGame = await storage.updateGame(req.params.gameId, { status: 'active' });
+      if (!updatedGame) {
+        res.status(404).json({ error: 'Game not found' });
+        return;
+      }
+      res.json(updatedGame);
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to reopen game' });
+    }
+  });
+
   app.get('/api/games/code/:code', async (req, res) => {
     try {
       const game = await storage.getGameByCode(req.params.code);
@@ -1015,6 +1195,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Sessions
   app.post('/api/games/:gameId/sessions', makeGameAccessMiddleware((req) => req.params.gameId), async (req, res) => {
     try {
+      const game = await storage.getGame(req.params.gameId);
+      if (game?.status === 'archived') {
+        res.status(400).json({ error: 'This game has ended. Reopen it to add questions.' });
+        return;
+      }
       const sessionData = insertSessionSchema.parse({
         ...req.body,
         gameId: req.params.gameId
@@ -1114,6 +1299,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const session = await storage.getSession(req.params.sessionId);
       if (!session || session.status !== 'draft') {
         res.status(400).json({ error: 'Cannot start session' });
+        return;
+      }
+      const sessionGame = await storage.getGame(session.gameId);
+      if (sessionGame?.status === 'archived') {
+        res.status(400).json({ error: 'This game has ended. Reopen it to start questions.' });
         return;
       }
 

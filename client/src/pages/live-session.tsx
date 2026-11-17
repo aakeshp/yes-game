@@ -47,6 +47,10 @@ export default function LiveSession() {
   const [hasChangedSinceSubmit, setHasChangedSinceSubmit] = useState(false);
   const [timerAnnouncement, setTimerAnnouncement] = useState("");
   const [hasJoined, setHasJoined] = useState(false);
+  // Why the server refused the join (shown on the page instead of loading forever)
+  const [joinError, setJoinError] = useState<string | null>(null);
+  // True if the server never answered the join request (e.g. the message was lost)
+  const [joinTimedOut, setJoinTimedOut] = useState(false);
   const announcedTimes = useRef<Set<number>>(new Set());
 
   const { data: adminUser } = useQuery<{isAdmin: boolean, name: string, email: string}>({
@@ -95,10 +99,19 @@ export default function LiveSession() {
     joinSession(sessionId, playerName || playerUser.displayName);
   }, [isConnected, sessionId, playerUser?.id, playerLoading]);
 
+  // If the server hasn't confirmed the join after a few seconds, stop showing "Loading" and offer a retry
+  useEffect(() => {
+    if (!hasJoined || participant || joinError) return;
+    const timer = setTimeout(() => setJoinTimedOut(true), 8000);
+    return () => clearTimeout(timer);
+  }, [hasJoined, participant, joinError]);
+
   useEffect(() => {
     if (!socket) return;
 
     const handleSessionJoined = (data: any) => {
+      setJoinError(null);
+      setJoinTimedOut(false);
       setParticipant(data.participant);
       setSession(data.session);
       setCurrentSubmission(data.currentSubmission || {});
@@ -138,6 +151,10 @@ export default function LiveSession() {
     };
 
     const handleError = (data: any) => {
+      if (data?.context === 'join') {
+        setJoinError(data.message || "Couldn't join this question.");
+        return;
+      }
       setIsSubmitting(false);
       toast({ title: "Error", description: data.message || "Something went wrong", variant: "destructive" });
     };
@@ -168,9 +185,10 @@ export default function LiveSession() {
     };
   }, [socket, sessionId, navigate, toast]);
 
+  // Tapping the already-selected vote keeps it selected, so a double-tap can't clear it by accident
   const handleVoteClick = (selectedVote: "YES" | "NO") => {
-    const newVote = vote === selectedVote ? "" : selectedVote;
-    setVote(newVote);
+    if (vote === selectedVote) return;
+    setVote(selectedVote);
     if (hasSubmitted) {
       setHasChangedSinceSubmit(true);
     }
@@ -182,9 +200,14 @@ export default function LiveSession() {
       return;
     }
 
+    if (!vote) {
+      toast({ title: "Choose Yes or No", description: "Pick your vote before submitting.", variant: "destructive" });
+      return;
+    }
+
     setIsSubmitting(true);
     submitVote(
-      vote || undefined,
+      vote,
       guess ? parseInt(guess, 10) : undefined
     );
   };
@@ -201,6 +224,33 @@ export default function LiveSession() {
         <Card>
           <CardContent className="p-6">
             <p className="text-muted-foreground">Connecting to game server...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if ((!session || !participant) && (joinError || joinTimedOut)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center px-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6 text-center space-y-4">
+            <h1 className="text-xl font-semibold text-foreground">
+              {joinError ? "You couldn't join this question" : "Couldn't connect to this question"}
+            </h1>
+            <p className="text-muted-foreground" role="alert" data-testid="text-join-error">
+              {joinError || "The game server didn't respond. Check your connection and try again."}
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              {!joinError && (
+                <Button onClick={() => window.location.reload()} data-testid="button-retry-join">
+                  Try again
+                </Button>
+              )}
+              <Button variant={joinError ? "default" : "outline"} onClick={() => navigate("/")} data-testid="button-back-lobby">
+                Back to lobby
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -321,6 +371,7 @@ export default function LiveSession() {
                     vote === "YES" ? "bg-secondary text-secondary-foreground shadow-lg" : ""
                   }`}
                   onClick={() => handleVoteClick("YES")}
+                  aria-pressed={vote === "YES"}
                   disabled={session.status !== 'live'}
                   data-testid="button-vote-yes"
                 >
@@ -337,6 +388,7 @@ export default function LiveSession() {
                     vote === "NO" ? "bg-destructive text-destructive-foreground shadow-lg" : ""
                   }`}
                   onClick={() => handleVoteClick("NO")}
+                  aria-pressed={vote === "NO"}
                   disabled={session.status !== 'live'}
                   data-testid="button-vote-no"
                 >
@@ -373,7 +425,8 @@ export default function LiveSession() {
                   />
                   <Button
                     onClick={handleSubmit}
-                    disabled={session.status !== 'live' || isSubmitting || (hasSubmitted && !hasChangedSinceSubmit)}
+                    disabled={session.status !== 'live' || !vote || isSubmitting || (hasSubmitted && !hasChangedSinceSubmit)}
+                    aria-describedby="submit-help"
                     className={`${hasSubmitted && !hasChangedSinceSubmit ? 'bg-secondary text-secondary-foreground' : 'bg-accent text-accent-foreground hover:bg-accent/90'}`}
                     data-testid="button-submit"
                   >
@@ -383,10 +436,12 @@ export default function LiveSession() {
                      "Submit"}
                   </Button>
                 </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {hasSubmitted && !hasChangedSinceSubmit 
-                    ? "Submission saved! You can still change your vote/guess if needed."
-                    : "You can update your vote and guess until the timer expires"
+                <p id="submit-help" className="text-xs text-muted-foreground mt-2" aria-live="polite">
+                  {!vote
+                    ? "Choose Yes or No above to submit."
+                    : hasSubmitted && !hasChangedSinceSubmit
+                      ? "Submission saved! You can still change your vote/guess if needed."
+                      : "You can update your vote and guess until the timer expires"
                   }
                 </p>
               </div>
